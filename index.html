@@ -125,7 +125,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text
 
 textarea, input[type="datetime-local"] { width: 100%; font: inherit; color: var(--ink); background: var(--surface2); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 textarea { min-height: 72px; resize: vertical; }
-input[type="datetime-local"] { min-height: 44px; }
+/* iPhone Safari gives date inputs a fixed native width that ignores width:100% — reset it so the box stays inside the card */
+input[type="datetime-local"] { min-height: 44px; display: block; min-width: 0; max-width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; text-align: left; line-height: 1.4; }
+input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+input[type="datetime-local"]::-webkit-datetime-edit { padding: 0; }
+.field { min-width: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .miss { font-size: 13px; color: var(--ink2); text-align: center; }
 
