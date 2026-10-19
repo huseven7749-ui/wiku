@@ -280,7 +280,7 @@ input:disabled { opacity: .55; }
     { n: 4, short: "唯美味-雞+蝦", name: "唯美雞蝦", g: 85, kind: "罐", kcal: 72.9, water: 85, est: false, src: "唯美味標示：62 大卡／85g，水分最多 85%" },
     { n: 5, short: "唯美味易開餐包-雞肉+鮭魚", name: "唯美餐雞鮭", g: 80, kind: "餐包", kcal: 95, water: 83, est: false, src: "唯美味標示：76 大卡／80g，水分最多 83%（雞鮭同遊）" },
     { n: 6, short: "法麗全照護-雞+番茄慕斯", name: "法黑罐番茄", g: 80, kind: "罐", kcal: 79, water: 83, est: false, src: "法麗包裝標示：79 大卡／100g，水分 83% 以下" },
-    { n: 7, short: "克勞德餐包-05號雞+鮪+菠", name: "克餐05", g: 85, kind: "餐包", kcal: 90, water: 80, est: true, src: "推估：克勞德同口味罐頭標示水分約 80%、蛋白質乾物 51%、脂肪乾物 27.5%，換算約 90 大卡／100g。查不到餐包本身的熱量，請照包裝修改" }
+    { n: 7, short: "克勞德餐包-05號雞+鮪+菠", name: "克餐05", g: 85, kind: "餐包", kcal: 93.2, water: 80, est: false, src: "克勞德標示：代謝能 79.2 kcal／包（85g），水分 80%（NO.5 鮮雞鮪魚炒菠菜）" }
   ];
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
   var SCORES = [
@@ -314,7 +314,7 @@ input:disabled { opacity: .55; }
 
   /* ---------- 狀態 ---------- */
   var meals = [];
-  var settings = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 2 };
+  var settings = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
   var tab = "today";
   var draft = null;
   var openCopy = null;     // text shown in the fallback copy box
@@ -331,11 +331,13 @@ input:disabled { opacity: .55; }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 
   function normSettings(s) {
-    var out = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 2 };
+    var out = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
     if (s && typeof s.portion === "number" && s.portion > 0) out.portion = s.portion;
     if (s && Array.isArray(s.sizes) && s.sizes.length === 7) out.sizes = s.sizes.map(function (v, i) { return v > 0 ? v : CANS[i].g; });
     if (s && Array.isArray(s.stock) && s.stock.length === 7) out.stock = s.stock.map(function (v) { return v >= 0 ? v : 3; });
-    if (s && s.nutV === 2 && Array.isArray(s.nut) && s.nut.length === 7) out.nut = s.nut.map(function (v, i) { return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
+    if (s && (s.nutV === 2 || s.nutV === 3) && Array.isArray(s.nut) && s.nut.length === 7) out.nut = s.nut.map(function (v, i) { return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
+    /* v3：克勞德 05 號改用包裝實際標示；舊的推估值（90／80）沒被改過就換成新的 */
+    if (s && s.nutV === 2 && out.nut[6] && out.nut[6].k === 0.9 && out.nut[6].w === 80) out.nut[6] = defNut()[6];
     return out;
   }
   function loadLocal() {
@@ -821,7 +823,7 @@ input:disabled { opacity: .55; }
         '<label class="gw"><input class="num" id="size' + i + '" type="number" inputmode="numeric" min="1" max="400" data-size="' + i + '"' + (isLocked() ? " disabled" : "") + ' value="' + settings.sizes[i] + '" aria-label="' + c.n + '號每' + c.kind + '重量（克）"><span class="hint">g</span></label></div>';
     });
     if (isLocked()) h += '<div class="lockbar"><span>' + LOCK_SVG + ' 只能看：克數、庫存、熱量要有編輯金鑰才能改</span><button class="btn small" data-act="unlock">輸入金鑰</button></div>';
-    h += '<div class="hint">右邊的克數是每罐／每包的重量，庫存是單據上的數量，開一罐就扣 1，都可以直接改。5 號和 7 號的重量在單據上被截斷，先用預設值。熱量和水分點「熱量、水分」展開，可照包裝修改。</div></section>';
+    h += '<div class="hint">右邊的克數是每罐／每包的重量，庫存是單據上的數量，開一罐就扣 1，都可以直接改。熱量和水分都是照包裝標示，點「熱量、水分」展開，可照包裝修改。</div></section>';
 
     h += '<section class="card"><h2>備用區</h2><div class="back">' +
       '<div class="b"><b>悅緻主食凍乾-鮮魚+羊</b><span>凍乾主要當作誘食，依吃的情況判斷怎麼用</span></div>' +
