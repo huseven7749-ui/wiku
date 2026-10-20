@@ -159,6 +159,7 @@ input[type="datetime-local"]::-webkit-datetime-edit { padding: 0; }
 .meal .l1 { display: flex; align-items: center; gap: 10px; }
 .meal .ttl { flex: 1; min-width: 0; }
 .meal .ttl b { font-weight: 700; }
+.meal .tm { flex: none; font-size: 17px; font-weight: 700; color: var(--ink); background: var(--accent-soft); border-radius: 10px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .meal .ttl span { display: block; font-size: 13px; color: var(--ink2); overflow-wrap: anywhere; }
 .meal .note { font-size: 14px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .meal .acts { display: flex; gap: 8px; justify-content: flex-end; }
@@ -754,7 +755,7 @@ input:disabled { opacity: .55; }
   function mealCard(x) {
     var m = x.m, pct = m.offered ? Math.round(m.eaten / m.offered * 100) : 0, mn = mealNut(x);
     var h = '<article class="meal"><div class="l1"><span class="badge num" style="--sc:var(--s' + m.score + ')" title="' + scoreFull(m.score) + '">' + m.score + '</span>' +
-      '<div class="ttl"><b>第' + x.n + '餐 ・ ' + hm(m.t) + ' ・ ' + scoreFull(m.score) + '</b><span>' + esc(partsLabel(x.parts)) + '</span></div></div>' +
+      '<div class="ttl"><b>第' + x.n + '餐 ・ ' + scoreFull(m.score) + '</b><span>' + esc(partsLabel(x.parts)) + '</span></div><span class="tm" title="用餐時間">' + hm(m.t) + '</span></div>' +
       '<div class="row"><span class="pill">吃 <b class="num">' + m.eaten + '</b> / ' + m.offered + ' g（' + pct + '%）</span><span class="pill">熱量 <b class="num">' + fmtN(mn.eatKcal) + '</b> 大卡</span><span class="pill">水份 <b class="num">' + fmtN(mn.eatWater) + '</b> g</span></div>';
     var tags = (m.extras || []).map(function (k) { return '<span class="t2">' + esc(labelOf(EXTRAS, k)) + '</span>'; }).concat((m.symptoms || []).map(function (k) { return '<span class="t2 warn">' + esc(labelOf(SYMPTOMS, k)) + '</span>'; }));
     if (tags.length) h += '<div class="tagrow">' + tags.join("") + '</div>';
