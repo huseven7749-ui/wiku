@@ -543,11 +543,12 @@ input:disabled { opacity: .55; }
 
   function computeAll() {
     var sorted = meals.slice().sort(function (a, b) { return a.t - b.t; });
-    var st = { next: 0, left: null }, list = [];
+    var st = { next: 0, left: null }, list = [], perDay = {};
     sorted.forEach(function (m, i) {
       var before = cloneSt(st);
       var parts = allocate(st, m.offered, settings.sizes);
-      list.push({ m: m, n: i + 1, parts: parts, before: before });
+      var dk = dayKey(m.t); perDay[dk] = (perDay[dk] || 0) + 1;
+      list.push({ m: m, n: perDay[dk], seq: i + 1, parts: parts, before: before });
     });
     return { list: list, st: st };
   }
@@ -667,7 +668,8 @@ input:disabled { opacity: .55; }
     var editing = !!draft.id;
     var found = editing ? all.list.filter(function (x) { return x.m.id === draft.id; })[0] : null;
     var baseSt = editing && found ? found.before : all.st;
-    var n = editing && found ? found.n : all.list.length + 1;
+    var dk0 = dayKey(draft.t);
+    var n = editing && found ? found.n : all.list.filter(function (x) { return dayKey(x.m.t) === dk0; }).length + 1;
     var plan = planFor(baseSt, draft.offered);
     var mood = draft.score != null ? draft.score : 3;
     var h = "";
@@ -679,7 +681,7 @@ input:disabled { opacity: .55; }
     h += '<div class="planhead">' + wikuFull(mood, "cat") + '<div class="bubble"><div class="big" id="h-plan">' + (editing ? "第 " + n + " 餐" : "下一餐：第 " + n + " 餐") + '</div><div class="small">第 ' + plan.round + ' 輪 ・ 目前吃到 ' + plan.parts[plan.parts.length - 1].can + "/7 號" + '</div></div></div>';
     var used = [0, 0, 0, 0, 0, 0, 0];
     all.list.forEach(function (x) {
-      if (editing && found && x.n >= found.n) return;
+      if (editing && found && x.seq >= found.seq) return;
       x.parts.forEach(function (p) { if (p.src === "open") used[p.can - 1]++; });
     });
     h += stepsHtml(plan, used);
