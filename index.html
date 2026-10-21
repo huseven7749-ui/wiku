@@ -540,6 +540,26 @@ input:disabled { opacity: .55; }
     }
     return parts;
   }
+  /* 手動指定罐頭：pick = [{can, g}, ...]；冰箱剩的同一罐先用，不夠再開新的 */
+  function allocatePick(st, pick, sizes) {
+    var parts = [];
+    pick.forEach(function (q) {
+      var need = q.g;
+      if (st.left && st.left.can === q.can && st.left.g > 0) {
+        var take = Math.min(need, st.left.g);
+        parts.push({ can: q.can, g: take, src: "fridge", round: st.left.round });
+        st.left.g -= take; need -= take;
+        if (st.left.g <= 0) st.left = null;
+      }
+      if (need > 0) {
+        var size = sizes[q.can - 1], tk = Math.min(need, size), rem = size - tk, round = Math.floor(st.next / 7) + 1;
+        parts.push({ can: q.can, g: tk, src: "open", rem: rem, round: round });
+        if (q.can - 1 === st.next % 7) st.next++;
+        if (rem > 0) st.left = { can: q.can, g: rem, round: round };
+      }
+    });
+    return parts;
+  }
   function cloneSt(st) { return { next: st.next, left: st.left ? { can: st.left.can, g: st.left.g, round: st.left.round } : null }; }
 
   function computeAll() {
@@ -547,14 +567,14 @@ input:disabled { opacity: .55; }
     var st = { next: 0, left: null }, list = [], perDay = {};
     sorted.forEach(function (m, i) {
       var before = cloneSt(st);
-      var parts = allocate(st, m.offered, settings.sizes);
+      var parts = (Array.isArray(m.pick) && m.pick.length) ? allocatePick(st, m.pick, settings.sizes) : allocate(st, m.offered, settings.sizes);
       var dk = dayKey(m.t); perDay[dk] = (perDay[dk] || 0) + 1;
       list.push({ m: m, n: perDay[dk], seq: i + 1, parts: parts, before: before });
     });
     return { list: list, st: st };
   }
-  function planFor(st, offered) {
-    var s = cloneSt(st), parts = allocate(s, offered, settings.sizes);
+  function planFor(st, offered, pick) {
+    var s = cloneSt(st), parts = pick ? allocatePick(s, pick, settings.sizes) : allocate(s, offered, settings.sizes);
     return { parts: parts, after: s, round: parts.length ? parts[0].round : Math.floor(st.next / 7) + 1 };
   }
   function canShort(n) { return CANS[n - 1].short; }
@@ -583,10 +603,20 @@ input:disabled { opacity: .55; }
 
   /* ---------- 草稿 ---------- */
   function newDraft() {
-    return { id: null, t: Date.now(), tAuto: true, offered: settings.portion, offTouched: false, eaten: null, eTouched: false, score: null, extras: [], symptoms: [], note: "" };
+    return { id: null, t: Date.now(), tAuto: true, offered: settings.portion, offTouched: false, eaten: null, eTouched: false, score: null, extras: [], symptoms: [], note: "", pick: null };
+  }
+  function pickOf(d) {
+    if (!d.pick) return null;
+    var p = d.pick;
+    if (p.b) { var ag = Math.min(Math.max(1, p.ag || Math.round(d.offered / 2)), d.offered - 1); return [{ can: p.a, g: ag }, { can: p.b, g: d.offered - ag }]; }
+    return [{ can: p.a, g: d.offered }];
+  }
+  function pickFromParts(parts) {
+    var a = parts[0], b = parts[1];
+    return { a: a.can, b: b && b.can !== a.can ? b.can : 0, ag: a.g };
   }
   function draftFromMeal(m) {
-    return { id: m.id, t: m.t, tAuto: false, offered: m.offered, offTouched: true, eaten: m.eaten, eTouched: true, score: m.score, extras: (m.extras || []).slice(), symptoms: (m.symptoms || []).slice(), note: m.note || "" };
+    return { id: m.id, t: m.t, tAuto: false, offered: m.offered, offTouched: true, eaten: m.eaten, eTouched: true, score: m.score, extras: (m.extras || []).slice(), symptoms: (m.symptoms || []).slice(), note: m.note || "", pick: (Array.isArray(m.pick) && m.pick.length) ? pickFromParts(m.pick) : null };
   }
   function prefillEaten() {
     if (draft.eTouched || draft.score == null) return;
@@ -640,6 +670,33 @@ input:disabled { opacity: .55; }
     return h + "</ul>";
   }
 
+  function pickHtml(autoPlan) {
+    var h = '<div class="field"><span class="label">這餐用哪一罐</span><div class="quick">' +
+      '<button class="chip" data-act="pickMode" data-v="auto" aria-pressed="' + !draft.pick + '">自動（照順序）</button>' +
+      '<button class="chip" data-act="pickMode" data-v="manual" aria-pressed="' + !!draft.pick + '">自己選</button></div>';
+    if (draft.pick) {
+      var pk = draft.pick, i;
+      h += '<div class="hint">第一個口味</div><div class="chips">';
+      for (i = 1; i <= 7; i++) h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '">' + i + '號</button>';
+      h += '</div><div class="hint">第二個口味（不夠才要選）</div><div class="chips"><button class="chip" data-act="pickB" data-v="0" aria-pressed="' + !pk.b + '">不用</button>';
+      for (i = 1; i <= 7; i++) h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + i + '號</button>';
+      h += '</div>';
+      if (pk.b) {
+        var pp = pickOf(draft);
+        h += '<div class="stepper"><button data-act="pickG" data-d="-5" aria-label="第一個口味減5克">−5</button><button data-act="pickG" data-d="-1" aria-label="第一個口味減1克">−1</button>' +
+          '<div class="val"><span class="num">' + pp[0].g + '</span><span class="u">g ＋ ' + pp[1].g + 'g</span></div>' +
+          '<button data-act="pickG" data-d="1" aria-label="第一個口味加1克">+1</button><button data-act="pickG" data-d="5" aria-label="第一個口味加5克">+5</button></div>';
+      }
+      h += '<div class="hint">自己選的罐頭會照你的選擇計算庫存、冰箱剩量和熱量；下一餐的順序跟著調整。</div>';
+    }
+    return h + '</div>';
+  }
+  function curAutoPlan() {
+    var all = computeAll(), editing = !!draft.id;
+    var found = editing ? all.list.filter(function (x) { return x.m.id === draft.id; })[0] : null;
+    return planFor(editing && found ? found.before : all.st, draft.offered, null);
+  }
+
   function streakAt(all, portion) {
     var list = all.list.slice().sort(function (a, b) { return b.m.t - a.m.t; }), n = 0;
     for (var i = 0; i < list.length; i++) {
@@ -671,7 +728,8 @@ input:disabled { opacity: .55; }
     var baseSt = editing && found ? found.before : all.st;
     var dk0 = dayKey(draft.t);
     var n = editing && found ? found.n : all.list.filter(function (x) { return dayKey(x.m.t) === dk0; }).length + 1;
-    var plan = planFor(baseSt, draft.offered);
+    var plan = planFor(baseSt, draft.offered, pickOf(draft));
+    var autoPlan = planFor(baseSt, draft.offered, null);
     var mood = draft.score != null ? draft.score : 3;
     var h = "";
 
@@ -686,6 +744,7 @@ input:disabled { opacity: .55; }
       x.parts.forEach(function (p) { if (p.src === "open") used[p.can - 1]++; });
     });
     h += stepsHtml(plan, used);
+    h += pickHtml(autoPlan);
     var pn = partsNut(plan.parts);
     h += '<div class="hint">這餐 ' + draft.offered + 'g 約 <b class="num">' + fmtN(pn.kcal) + '</b> 大卡、含水 <b class="num">' + fmtN(pn.water) + '</b>g（依罐頭標示估算）</div>';
     h += '<div class="field"><span class="label">本餐份量</span><div class="stepper">' +
@@ -896,6 +955,7 @@ input:disabled { opacity: .55; }
       t: t, offered: draft.offered, eaten: Number(draft.eaten), score: draft.score,
       extras: draft.extras.slice(), symptoms: draft.symptoms.slice(), note: draft.note.trim()
     };
+    var pk = pickOf(draft); if (pk) m.pick = pk;
     var wasEdit = !!draft.id;
     var idx = meals.findIndex(function (x) { return x.id === m.id; });
     if (idx >= 0) meals[idx] = m; else meals.push(m);
@@ -970,7 +1030,12 @@ input:disabled { opacity: .55; }
     if (!m || typeof m.id !== "string" || !m.id || typeof m.t !== "number" || typeof m.offered !== "number" || typeof m.eaten !== "number" || typeof m.score !== "number") return null;
     if (!(m.offered > 0) || !(m.eaten >= 0) || m.score < 0 || m.score > 4 || m.score % 1) return null;
     var str = function (a) { return Array.isArray(a) ? a.filter(function (x) { return typeof x === "string"; }).slice(0, 10) : []; };
-    return { id: m.id.slice(0, 40), t: m.t, offered: m.offered, eaten: m.eaten, score: m.score, extras: str(m.extras), symptoms: str(m.symptoms), note: typeof m.note === "string" ? m.note.slice(0, 500) : "" };
+    var out = { id: m.id.slice(0, 40), t: m.t, offered: m.offered, eaten: m.eaten, score: m.score, extras: str(m.extras), symptoms: str(m.symptoms), note: typeof m.note === "string" ? m.note.slice(0, 500) : "" };
+    if (Array.isArray(m.pick)) {
+      var pk = m.pick.filter(function (q) { return q && q.can >= 1 && q.can <= 7 && q.can % 1 === 0 && q.g > 0; }).slice(0, 2).map(function (q) { return { can: q.can, g: q.g }; });
+      if (pk.length) out.pick = pk;
+    }
+    return out;
   }
   function importBackup(text) {
     var data;
@@ -1156,6 +1221,22 @@ input:disabled { opacity: .55; }
       var l = el.getAttribute("data-l"), k = el.getAttribute("data-k"), arr = draft[l], i = arr.indexOf(k);
       if (i >= 0) arr.splice(i, 1); else arr.push(k);
       render(); return;
+    }
+    if (act === "pickMode") {
+      if (el.getAttribute("data-v") === "auto") draft.pick = null;
+      else { var ap = curAutoPlan(); draft.pick = pickFromParts(ap.parts); }
+      render(); return;
+    }
+    if (act === "pickA" && draft.pick) {
+      var va = Number(el.getAttribute("data-v")); draft.pick.a = va; if (draft.pick.b === va) draft.pick.b = 0; render(); return;
+    }
+    if (act === "pickB" && draft.pick) {
+      var vb = Number(el.getAttribute("data-v")); draft.pick.b = vb === draft.pick.a ? 0 : vb;
+      if (draft.pick.b && !draft.pick.ag) draft.pick.ag = Math.round(draft.offered / 2);
+      render(); return;
+    }
+    if (act === "pickG" && draft.pick) {
+      var cg = pickOf(draft)[0].g; draft.pick.ag = Math.min(Math.max(1, cg + Number(el.getAttribute("data-d"))), draft.offered - 1); render(); return;
     }
     if (act === "tour") { startTour(); return; }
     if (act === "save") { guard(saveDraft); return; }
