@@ -960,7 +960,9 @@ input:disabled { opacity: .55; }
     var idx = meals.findIndex(function (x) { return x.id === m.id; });
     if (idx >= 0) meals[idx] = m; else meals.push(m);
     writeMeal(m);
-    if (!wasEdit && settings.portion !== m.offered) { settings.portion = m.offered; writeSettings(); }
+    /* 最新一餐的份量就是下一餐的預設份量（新增或編輯都算；補記更早的餐不影響） */
+    var latest = meals.reduce(function (a, x) { return x.t > a.t ? x : a; }, meals[0]);
+    if (latest.id === m.id && settings.portion !== m.offered) { settings.portion = m.offered; writeSettings(); }
     var n = computeAll().list.filter(function (x) { return x.m.id === m.id; })[0].n;
     draft = newDraft();
     armedDel = null;
