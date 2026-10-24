@@ -391,6 +391,7 @@ input:disabled { opacity: .55; }
   var key = null;            // 這支手機的 GitHub 金鑰
   var queue = [];            // 還沒上傳到 GitHub 的變動
   var syncing = false, syncAgain = false, lastSync = 0, syncErr = "", keyArmed = false;
+  var lastPut = null, retryTimer = null;   // 上一次自己寫上去的版本：GitHub 剛寫完的幾秒內常會讀到舊檔，用它補
 
   function loadKey() {
     key = lsGet(LS_K) || null;
@@ -474,22 +475,31 @@ input:disabled { opacity: .55; }
     meals = view.meals; settings = view.settings; days = view.days; cloud = true;
     saveLocal();
   }
+  function wait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  /* GitHub 剛寫完的幾秒內，讀到的可能還是上一版；比自己剛寫的舊，就用自己剛寫的 */
+  function fresher(res) {
+    if (lastPut && lastPut.sha && (!res.doc || (res.doc.updated || 0) < (lastPut.doc.updated || 0))) return { doc: lastPut.doc, sha: lastPut.sha };
+    return res;
+  }
   function sync() {
     if (syncing) { syncAgain = true; return; }
     syncing = true; syncAgain = false;
+    clearTimeout(retryTimer);
     var pending = queue.slice(), tries = 0;
     var attempt = function () {
       tries++;
       return ghGet(!!key).then(function (res) {
+        res = fresher(res);
         if (!pending.length || !key) { adopt(res.doc); return; }
         var doc = normDoc(res.doc);
         pending.forEach(function (op) { applyOp(doc, op); });
-        doc.updated = Date.now();
-        return ghPut(doc, res.sha).then(function () {
+        doc.updated = Math.max(Date.now(), ((res.doc && res.doc.updated) || 0) + 1);
+        return ghPut(doc, res.sha).then(function (sha) {
+          lastPut = { doc: JSON.parse(JSON.stringify(doc)), sha: sha };
           queue = queue.slice(pending.length); saveQueue();
           adopt(doc);
         }, function (e) {
-          if (e && e.code === "conflict" && tries < 4) return attempt();
+          if (e && e.code === "conflict" && tries < 7) return wait(500 * tries).then(attempt);
           throw e;
         });
       });
@@ -499,6 +509,7 @@ input:disabled { opacity: .55; }
       if (!err) lastSync = Date.now();
       render();
       if (syncAgain) sync();
+      else if (err && err !== "badkey" && err !== "noperm" && queue.length) retryTimer = setTimeout(function () { if (queue.length) sync(); }, 4000);
     };
     attempt().then(function () { done(""); }, function (e) {
       var c = e && e.code;
@@ -1237,6 +1248,24 @@ input:disabled { opacity: .55; }
       im.src = src;
     });
   }
+  /* 一條大便的圖案（三層、帶眼睛），中心 (cx, cy)，高 s */
+  function poopIcon(c, cx, cy, s) {
+    var tiers = [[0.50, 0.30, 0.25], [0.39, 0.25, 0.01], [0.27, 0.21, -0.21]];  // 半寬, 半高, 中心偏移（比例）
+    c.save();
+    c.fillStyle = "#8A5A3B"; c.strokeStyle = "#5E3B24"; c.lineWidth = Math.max(2, s * 0.045);
+    c.beginPath(); c.moveTo(cx - s * 0.06, cy - s * 0.36); c.quadraticCurveTo(cx + s * 0.02, cy - s * 0.52, cx + s * 0.10, cy - s * 0.47); c.quadraticCurveTo(cx + s * 0.12, cy - s * 0.34, cx + s * 0.04, cy - s * 0.31); c.closePath(); c.fill(); c.stroke();
+    tiers.forEach(function (t) { c.beginPath(); c.ellipse(cx, cy + s * t[2], s * t[0], s * t[1], 0, 0, Math.PI * 2); c.fill(); c.stroke(); });
+    tiers.forEach(function (t) { c.beginPath(); c.ellipse(cx, cy + s * t[2], s * t[0] - c.lineWidth / 2, s * t[1] - c.lineWidth / 2, 0, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = "rgba(255,255,255,0.28)";
+    tiers.forEach(function (t) { c.beginPath(); c.ellipse(cx - s * t[0] * 0.45, cy + s * t[2] - s * t[1] * 0.35, s * t[0] * 0.28, s * t[1] * 0.28, -0.4, 0, Math.PI * 2); c.fill(); });
+    [-1, 1].forEach(function (d) {
+      c.fillStyle = "#fff"; c.beginPath(); c.arc(cx + d * s * 0.13, cy + s * 0.01, s * 0.075, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "#2E1E14"; c.beginPath(); c.arc(cx + d * s * 0.13 + s * 0.012, cy + s * 0.015, s * 0.038, 0, Math.PI * 2); c.fill();
+    });
+    c.strokeStyle = "#2E1E14"; c.lineWidth = Math.max(2, s * 0.035); c.lineCap = "round";
+    c.beginPath(); c.arc(cx, cy + s * 0.2, s * 0.09, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+    c.restore();
+  }
   async function dayImage(k, over) {
     var all = computeAll();
     var items = over || all.list.filter(function (x) { return dayKey(x.m.t) === k; }).sort(function (a, b) { return a.m.t - b.m.t; });
@@ -1244,7 +1273,8 @@ input:disabled { opacity: .55; }
     try {
       await Promise.all([document.fonts.load("40px Huninn"), document.fonts.load("400 28px 'Noto Sans TC'"), document.fonts.load("700 28px 'Noto Sans TC'")]);
     } catch (e) { /* fall back to system fonts */ }
-    var W = 1080, rowH = 190, headH = 620, footH = 257, H = headH + items.length * rowH + footH;
+    var poopN = over ? 2 : poopOf(k), dw = dayWeight(items);
+    var W = 1080, rowH = 190, band = 130, headH = 620 + band, footH = dw ? 257 : 215, H = headH + items.length * rowH + footH;
     var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
     var c = cv.getContext("2d");
     var DISP = "Huninn, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif";
@@ -1266,11 +1296,22 @@ input:disabled { opacity: .55; }
     c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(new Date(items[0].m.t).getFullYear() + " ・ 今天的吃飯狀況", 360, 255);
 
     if (over) { c.fillStyle = "#B3665D"; c.font = "400 40px " + DISP; c.textAlign = "right"; c.fillText("範例", W - 48, 100); c.textAlign = "left"; }
+    // 大便（圖案）：放在最上面
+    (function () {
+      var x = 48, y = 300, w = 984, h = 112;
+      c.fillStyle = "#FAF6F1"; rr(c, x, y, w, h, 26); c.fill(); c.strokeStyle = "#8C7A6E"; c.lineWidth = 4; c.stroke();
+      c.fillStyle = "#4A3F3A"; c.font = "400 40px " + DISP; c.fillText("大便", x + 28, y + 72);
+      var ix = x + 170, cy = y + h / 2 + 2, size = 70, step = 82, maxN = 8;
+      if (!poopN) { c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(k === dayKey(Date.now()) ? "今天還沒有" : "這天沒有紀錄", ix, y + 68); }
+      for (var i = 0; i < Math.min(poopN, maxN); i++) poopIcon(c, ix + i * step + size / 2, cy, size);
+      if (poopN > maxN) { c.fillStyle = "#7E6F66"; c.font = "400 34px " + BODY; c.fillText("…", ix + maxN * step, y + 70); }
+      c.fillStyle = "#4A3F3A"; c.font = "400 56px " + DISP; c.textAlign = "right"; c.fillText(poopN + " 條", x + w - 28, y + 76); c.textAlign = "left";
+    })();
     // summary tiles
     var tiles = [["餐數", items.length + " 餐"], ["平均食欲", fmt1(a) + " 分"], ["吃了 / 供給", eaten + " / " + offered + " g"]];
     var tw = (984 - 40) / 3;
     tiles.forEach(function (t, i) {
-      var x = 48 + i * (tw + 20), y = 305;
+      var x = 48 + i * (tw + 20), y = 305 + band;
       c.fillStyle = "#FAF6F1"; rr(c, x, y, tw, 135, 26); c.fill(); c.strokeStyle = "#8C7A6E"; c.lineWidth = 4; c.stroke();
       c.fillStyle = "#7E6F66"; c.font = "400 26px " + BODY; c.fillText(t[0], x + 24, y + 44);
       c.fillStyle = "#4A3F3A"; c.font = "400 " + (i === 2 ? 46 : 56) + "px " + DISP; c.fillText(t[1], x + 24, y + 106);
@@ -1278,7 +1319,7 @@ input:disabled { opacity: .55; }
 
     var dn = dayNut(items), tw2 = (984 - 20) / 2;
     [["吃進熱量", fmtN(dn.eatKcal) + " 大卡", "供給 " + fmtN(dn.offKcal) + " 大卡"], ["吃進水份", fmtN(dn.eatWater) + " g", "含水率 " + fmtN(dn.pct) + "%"]].forEach(function (t, i) {
-      var x = 48 + i * (tw2 + 20), y = 455;
+      var x = 48 + i * (tw2 + 20), y = 455 + band;
       c.fillStyle = "#FAF6F1"; rr(c, x, y, tw2, 135, 26); c.fill(); c.strokeStyle = "#8C7A6E"; c.lineWidth = 4; c.stroke();
       c.fillStyle = "#7E6F66"; c.font = "400 26px " + BODY; c.fillText(t[0], x + 24, y + 44);
       c.fillStyle = "#4A3F3A"; c.font = "400 56px " + DISP; c.fillText(t[1], x + 24, y + 106);
@@ -1309,12 +1350,12 @@ input:disabled { opacity: .55; }
     var fy = headH + items.length * rowH;
     c.fillStyle = "#4A3F3A"; c.font = "400 30px " + BODY;
     c.fillText("益生菌：" + (prob ? "已吃" : "未吃") + "　嘔吐：" + (vom ? vom + " 次" : "無") + "　拉肚子/軟便：" + (loose ? loose + " 次" : "無"), 48, fy + 50);
-    var dw = dayWeight(items);
-    c.fillText("大便：" + (over ? 2 : poopOf(k)) + " 條" + (dw ? "　體重：" + fmtW(dw) + " kg" : ""), 48, fy + 92);
+    var ly = fy + 50;
+    if (dw) { ly += 42; c.fillText("體重：" + fmtW(dw) + " kg", 48, ly); }
     c.fillStyle = "#7E6F66"; c.font = "400 24px " + BODY;
-    c.fillText("食欲分數 4 喜歡吃 ・ 3 吃剩1~2口 ・ 2 吃一半 ・ 1 只吃1~2口 ・ 0 完全不愛", 48, fy + 138);
-    c.fillText("熱量和水份依罐頭標示和實際吃的量估算，不含凍乾等備用區", 48, fy + 176);
-    c.fillText("WIKU 餵食日記", 48, fy + 214);
+    c.fillText("食欲分數 4 喜歡吃 ・ 3 吃剩1~2口 ・ 2 吃一半 ・ 1 只吃1~2口 ・ 0 完全不愛", 48, ly + 46);
+    c.fillText("熱量和水份依罐頭標示和實際吃的量估算，不含凍乾等備用區", 48, ly + 84);
+    c.fillText("WIKU 餵食日記", 48, ly + 122);
 
     return new Promise(function (res) { cv.toBlob(function (b) { res(b); }, "image/png"); });
   }
@@ -1560,7 +1601,10 @@ input:disabled { opacity: .55; }
     if (queue.length && syncErr !== "badkey" && syncErr !== "noperm") sync();
     else if (Date.now() - lastSync > 90000) sync();
   }, 20000);
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && Date.now() - lastSync > 15000) sync(); });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" ? (queue.length || Date.now() - lastSync > 15000) : queue.length) sync();
+  });
+  window.addEventListener("pagehide", function () { if (queue.length) sync(); });
   window.addEventListener("online", function () { sync(); });
 
   lsSet("wiku.t", "1");
