@@ -94,6 +94,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text
 .leftover .alert { display: block; font-size: 13px; font-weight: 700; color: var(--ink); background: var(--accent-soft); border-radius: 10px; padding: 6px 8px; margin-top: 4px; }
 .poop { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .poop .stepper { flex: 0 1 220px; }
+.poopbox { background: var(--surface2); border-radius: 14px; padding: 10px 12px; }
+.poopbox b#h-poop { font-size: 16px; }
 .wt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wfield { background: var(--accent-soft); border-radius: 14px; padding: 10px 12px; }
 .wt input { width: 130px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: 600 18px var(--font-body); -webkit-appearance: none; appearance: none; }
@@ -915,14 +917,14 @@ input:disabled { opacity: .55; }
     // 今天已記錄
     var today = dayKey(Date.now());
     var tm = all.list.filter(function (x) { return dayKey(x.m.t) === today; }).sort(function (a, b) { return b.m.t - a.m.t; });
-    h += poopCard(today);
+    if (!tm.length) h += '<section class="card">' + poopBox(today) + '</section>';
     if (tm.length) {
       var first = tm[tm.length - 1];
       h += '<section class="card"><h2>今天已記錄</h2>';
       if (new Date().getDay() === 6 && !(first.m.weight > 0) && draft.id !== first.m.id) {
         h += '<div class="suggest"><span>今天週六，第一餐還沒記體重</span><button class="btn small" data-act="edit" data-focus="weight" data-id="' + esc(first.m.id) + '">補記體重</button></div>';
       }
-      h +=
+      h += poopBox(today) +
         '<button class="btn block" data-act="saveImg" data-k="' + today + '">一鍵保存今日圖片</button>' +
         '<div class="hint">最後一餐記完後按這裡，會把今天每餐的食欲和吃的量做成一張圖。熱量和水份依罐頭標示估算，不含備用區。</div>' + nutriBox(tm) + previewHtml(today) + '<div class="mini">';
       tm.forEach(function (x) {
@@ -933,10 +935,10 @@ input:disabled { opacity: .55; }
     return h;
   }
 
-  function poopCard(k) {
-    return '<section class="card" aria-labelledby="h-poop"><div class="poop"><div><h2 id="h-poop">今天大便</h2><div class="hint">一顆算一條，看到幾條就按幾下 +1。</div></div>' +
+  function poopBox(k) {
+    return '<div class="poop poopbox"><div><b id="h-poop">今天大便</b><div class="hint">一顆算一條，看到幾條就按幾下 +1。</div></div>' +
       '<div class="stepper"><button data-act="poop" data-k="' + k + '" data-d="-1" aria-label="大便減1條">−1</button><div class="val"><span class="num" id="poopVal">' + poopOf(k) + '</span><span class="u">條</span></div>' +
-      '<button data-act="poop" data-k="' + k + '" data-d="1" aria-label="大便加1條">+1</button></div></div></section>';
+      '<button data-act="poop" data-k="' + k + '" data-d="1" aria-label="大便加1條">+1</button></div></div>';
   }
   function tossedText(x) { return x.m.prev === "toss" && x.before && x.before.bowl ? "倒掉上餐剩的 " + x.before.bowl.g + "g" : ""; }
   function mealCard(x) {
@@ -986,9 +988,10 @@ input:disabled { opacity: .55; }
     }
     order.forEach(function (k) {
       var items = days[k], a = avg(items.map(function (x) { return x.m.score; }));
-      h += '<section class="card day"><div class="dayh"><div><h3>' + dayLabel(items[0].m.t) + '</h3><div class="meta">' + items.length + ' 餐 ・ 平均 ' + fmt1(a) + ' 分 ・ 大便 ' + poopOf(k) + ' 條' + (dayWeight(items) ? ' ・ 體重 ' + fmtW(dayWeight(items)) + ' kg' : '') + '</div></div><div class="row"><button class="btn small" data-act="saveImg" data-k="' + k + '">存成圖片</button><button class="btn ghost small" data-act="copyDay" data-k="' + k + '">複製回報</button></div></div>';
+      h += '<section class="card day"><div class="dayh"><div><h3>' + dayLabel(items[0].m.t) + '</h3><div class="meta">' + items.length + ' 餐 ・ 平均 ' + fmt1(a) + ' 分 ・ 大便 ' + poopOf(k) + ' 條' + (dayWeight(items) ? ' ・ 體重 ' + fmtW(dayWeight(items)) + ' kg' : '') + '</div></div></div>';
+      h += '<div class="poop poopbox"><span>大便 <b class="num">' + poopOf(k) + '</b> 條</span><div class="row"><button class="btn ghost small" data-act="poop" data-k="' + k + '" data-d="-1" aria-label="' + dayLabel(items[0].m.t) + '大便減1條">−1</button><button class="btn ghost small" data-act="poop" data-k="' + k + '" data-d="1" aria-label="' + dayLabel(items[0].m.t) + '大便加1條">+1</button></div></div>';
+      h += '<div class="row"><button class="btn small" data-act="saveImg" data-k="' + k + '">存成圖片</button><button class="btn ghost small" data-act="copyDay" data-k="' + k + '">複製回報</button></div>';
       h += nutriBox(items);
-      h += '<div class="poop"><span>大便 <b class="num">' + poopOf(k) + '</b> 條</span><div class="row"><button class="btn ghost small" data-act="poop" data-k="' + k + '" data-d="-1" aria-label="' + dayLabel(items[0].m.t) + '大便減1條">−1</button><button class="btn ghost small" data-act="poop" data-k="' + k + '" data-d="1" aria-label="' + dayLabel(items[0].m.t) + '大便加1條">+1</button></div></div>';
       h += previewHtml(k);
       if (openCopy && openCopy.scope === k) h += copyBox();
       items.forEach(function (x) { h += mealCard(x); });
