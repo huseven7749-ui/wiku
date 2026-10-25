@@ -1296,7 +1296,7 @@ input:disabled { opacity: .55; }
     if (cat) { var cw = 280, ch = cw * cat.height / cat.width; c.drawImage(cat, 48, 40 + (230 - ch) / 2, cw, ch); }
     c.fillStyle = "#4A3F3A"; c.font = "400 68px " + DISP; c.fillText("WIKU 餵食日記", 360, 130);
     c.fillStyle = "#B3665D"; c.font = "400 52px " + DISP; c.fillText(dayLabel(items[0].m.t), 360, 205);
-    c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(new Date(items[0].m.t).getFullYear() + " ・ 今天的吃飯狀況", 360, 255);
+    c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(new Date(items[0].m.t).getFullYear() + " ・ 今天的吃飯狀況 ・ " + (over ? "範例" : "製作於 " + hm(Date.now())), 360, 255);
 
     if (over) { c.fillStyle = "#B3665D"; c.font = "400 40px " + DISP; c.textAlign = "right"; c.fillText("範例", W - 48, 100); c.textAlign = "left"; }
     // 大便（圖案）：放在最上面
@@ -1335,9 +1335,13 @@ input:disabled { opacity: .55; }
       c.fillStyle = col; c.beginPath(); c.arc(48 + 78, y + h / 2, 48, 0, Math.PI * 2); c.fill();
       c.fillStyle = "#fff"; c.font = "400 56px " + DISP; c.textAlign = "center"; c.fillText(String(m.score), 48 + 78, y + h / 2 + 20); c.textAlign = "left";
       var tx = 48 + 150, rightX = 48 + 984 - 28;
-      c.fillStyle = "#4A3F3A"; c.font = "700 34px " + BODY; c.fillText("第" + x.n + "餐 " + hm(m.t) + "  " + scoreFull(m.score), tx, y + 46);
+      c.fillStyle = "#4A3F3A"; c.font = "700 34px " + BODY; c.fillText("第" + x.n + "餐  " + scoreFull(m.score), tx, y + 46);
+      // 用餐時間：右上角明顯的時間標籤
+      c.font = "400 40px " + DISP; var tt = hm(m.t), tW = c.measureText(tt).width + 36, tX = rightX - tW;
+      c.fillStyle = "#F2DCD6"; rr(c, tX, y + 14, tW, 58, 18); c.fill();
+      c.fillStyle = "#4A3F3A"; c.fillText(tt, tX + 18, y + 58);
       var tags = (m.extras || []).map(function (k2) { return labelOf(EXTRAS, k2); }).concat((m.symptoms || []).map(function (k2) { return "⚠" + labelOf(SYMPTOMS, k2); }));
-      if (tags.length) { c.fillStyle = "#B3665D"; c.font = "400 24px " + BODY; c.textAlign = "right"; c.fillText(tags.join(" "), rightX, y + 46); c.textAlign = "left"; }
+      if (tags.length) { c.fillStyle = "#B3665D"; c.font = "400 24px " + BODY; c.textAlign = "right"; c.fillText(tags.join(" "), tX - 14, y + 46); c.textAlign = "left"; }
       c.fillStyle = "#7E6F66"; c.font = "400 26px " + BODY;
       wrapLines(c, partsLabel(x.parts), rightX - tx, 2).forEach(function (ln, j) { c.fillText(ln, tx, y + 84 + j * 32); });
       var by = y + h - 34, bw = 560, pct = m.offered ? Math.min(1, m.eaten / m.offered) : 0;
