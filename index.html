@@ -650,7 +650,7 @@ input:disabled { opacity: .55; }
       var before = cloneSt(st);
       var parts = serve(st, m.offered, (Array.isArray(m.pick) && m.pick.length) ? m.pick : null, m.prev);
       var lo = Math.max(0, m.offered - m.eaten);
-      st.bowl = lo > 0 && parts.length ? makeBowl(parts, lo, m.t) : null;
+      st.bowl = lo > 0 && m.score <= 2 && parts.length ? makeBowl(parts, lo, m.t) : null;  // 只剩1~2口（3分以上）一律倒掉；吃一半以下才留到下一餐
       var dk = dayKey(m.t); perDay[dk] = (perDay[dk] || 0) + 1;
       list.push({ m: m, n: perDay[dk], seq: i + 1, parts: parts, before: before });
     });
