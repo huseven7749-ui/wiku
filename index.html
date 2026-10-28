@@ -160,6 +160,22 @@ input[type="datetime-local"]::-webkit-datetime-edit { padding: 0; }
 .badge { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 18px; color: #fff; background: var(--sc); }
 
 /* history */
+.lview { display: flex; gap: 8px; }
+.hmonth summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.hmonth summary::-webkit-details-marker { display: none; }
+.hmonth summary h2::after { content: " ▾"; font-size: 14px; color: var(--ink2); }
+.hmonth:not([open]) summary h2::after { content: " ▸"; }
+.hmsum { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.hweeks { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.hweek { background: var(--surface2); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.hweek .hd { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.hweek .hd b { font-weight: 700; }
+.hcells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.hcells i { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 40px; border-radius: 8px; font-style: normal; font-size: 11px; line-height: 1.15; background: var(--surface); border: 1px dashed var(--line); color: var(--ink2); }
+.hcells i.on { background: var(--sc); border: 0; color: #fff; font-weight: 700; }
+.hcells i.out { visibility: hidden; }
+.hstats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink2); }
+.hstats b { color: var(--ink); }
 .trend { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; }
 .trend .d { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .trend .bars { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 64px; width: 100%; }
@@ -297,8 +313,16 @@ input:disabled { opacity: .55; }
     { n: 4, short: "唯美味-雞+蝦", name: "唯美雞蝦", g: 85, kind: "罐", kcal: 72.9, water: 85, est: false, src: "唯美味標示：62 大卡／85g，水分最多 85%" },
     { n: 5, short: "唯美味易開餐包-雞肉+鮭魚", name: "唯美餐雞鮭", g: 80, kind: "餐包", kcal: 95, water: 83, est: false, src: "唯美味標示：76 大卡／80g，水分最多 83%（雞鮭同遊）" },
     { n: 6, short: "法麗全照護-雞+番茄慕斯", name: "法黑罐番茄", g: 80, kind: "罐", kcal: 79, water: 83, est: false, src: "法麗包裝標示：79 大卡／100g，水分 83% 以下" },
-    { n: 7, short: "克勞德餐包-05號雞+鮪+菠", name: "克餐05", g: 85, kind: "餐包", kcal: 93.2, water: 80, est: false, src: "克勞德標示：代謝能 79.2 kcal／包（85g），水分 80%（NO.5 鮮雞鮪魚炒菠菜）" }
+    { n: 7, short: "克勞德餐包-05號雞+鮪+菠", name: "克餐05", g: 85, kind: "餐包", kcal: 93.2, water: 80, est: false, src: "克勞德標示：代謝能 79.2 kcal／包（85g），水分 80%（NO.5 鮮雞鮪魚炒菠菜）" },
+    { n: 8, short: "法麗全照護-雞+鮪魚慕斯", name: "法黑罐鮪魚", g: 80, kind: "罐", kcal: 85, water: 83, est: false, src: "Purrmaster 營養資料庫（引用 pettric 商品頁）：85 大卡／100g，水分 83% 以下；法麗官網沒有單一口味資料，請對照罐身" }
   ];
+  /* 吃的順序：from 之後開始用這組。舊紀錄照當時的順序算，不會被改掉 */
+  var LINEUPS = [
+    { from: 0, cans: [1, 2, 3, 4, 5, 6, 7] },
+    { from: 1793182500000, cans: [7, 8] }   // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
+  ];
+  function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
+  function luOf(t) { return LINEUPS[lineupAt(t)].cans; }
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
   var SCORES = [
     { v: 4, short: "喜歡吃", full: "喜歡吃" },
@@ -336,6 +360,7 @@ input:disabled { opacity: .55; }
   var days = {};           // 每天的紀錄：{ "2026-10-24": { poop: 2 } }
   var settings = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
   var tab = "today";
+  var logView = "days";    // 紀錄頁：每天 / 歷史
   var draft = null;
   var openCopy = null;     // text shown in the fallback copy box
   var armedDel = null;
@@ -353,9 +378,9 @@ input:disabled { opacity: .55; }
   function normSettings(s) {
     var out = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
     if (s && typeof s.portion === "number" && s.portion > 0) out.portion = s.portion;
-    if (s && Array.isArray(s.sizes) && s.sizes.length === 7) out.sizes = s.sizes.map(function (v, i) { return v > 0 ? v : CANS[i].g; });
-    if (s && Array.isArray(s.stock) && s.stock.length === 7) out.stock = s.stock.map(function (v) { return v >= 0 ? v : 3; });
-    if (s && (s.nutV === 2 || s.nutV === 3) && Array.isArray(s.nut) && s.nut.length === 7) out.nut = s.nut.map(function (v, i) { return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
+    if (s && Array.isArray(s.sizes)) out.sizes = CANS.map(function (c, i) { var v = s.sizes[i]; return v > 0 ? v : c.g; });
+    if (s && Array.isArray(s.stock)) out.stock = CANS.map(function (c, i) { var v = s.stock[i]; return v >= 0 ? v : 3; });
+    if (s && (s.nutV === 2 || s.nutV === 3) && Array.isArray(s.nut)) out.nut = CANS.map(function (c, i) { var v = s.nut[i]; return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
     /* v3：克勞德 05 號改用包裝實際標示；舊的推估值（90／80）沒被改過就換成新的 */
     if (s && s.nutV === 2 && out.nut[6] && out.nut[6].k === 0.9 && out.nut[6].w === 80) out.nut[6] = defNut()[6];
     return out;
@@ -365,6 +390,7 @@ input:disabled { opacity: .55; }
     try { days = cleanDays(JSON.parse(lsGet(LS_D) || "{}")); } catch (e) { days = {}; }
     try { settings = normSettings(JSON.parse(lsGet(LS_S) || "null")); } catch (e) { /* default */ }
     var t = lsGet(LS_T); if (t === "log" || t === "cans" || t === "today") tab = t;
+    if (lsGet("wiku.logview") === "history") logView = "history";
   }
   function saveLocal() { lsSet(LS_M, JSON.stringify(meals)); lsSet(LS_S, JSON.stringify(settings)); lsSet(LS_D, JSON.stringify(days)); }
   function cleanDays(d) {
@@ -580,11 +606,11 @@ input:disabled { opacity: .55; }
       if (st.left.g <= 0) st.left = null;
     }
     while (need > 0 && guard++ < 30) {
-      var idx = st.next % 7, round = Math.floor(st.next / 7) + 1;
-      var size = sizes[idx], tk = Math.min(need, size), rem = size - tk;
-      parts.push({ can: idx + 1, g: tk, src: "open", rem: rem, round: round });
+      var lu = LINEUPS[st.li || 0].cans, can = lu[st.next % lu.length], round = Math.floor(st.next / lu.length) + 1;
+      var size = sizes[can - 1], tk = Math.min(need, size), rem = size - tk;
+      parts.push({ can: can, g: tk, src: "open", rem: rem, round: round });
       need -= tk; st.next++;
-      if (rem > 0) st.left = { can: idx + 1, g: rem, round: round };
+      if (rem > 0) st.left = { can: can, g: rem, round: round };
     }
     return parts;
   }
@@ -600,17 +626,27 @@ input:disabled { opacity: .55; }
         if (st.left.g <= 0) st.left = null;
       }
       if (need > 0) {
-        var size = sizes[q.can - 1], tk = Math.min(need, size), rem = size - tk, round = Math.floor(st.next / 7) + 1;
+        var lu = LINEUPS[st.li || 0].cans, size = sizes[q.can - 1], tk = Math.min(need, size), rem = size - tk, round = Math.floor(st.next / lu.length) + 1;
         parts.push({ can: q.can, g: tk, src: "open", rem: rem, round: round });
-        if (q.can - 1 === st.next % 7) st.next++;
+        if (q.can === lu[st.next % lu.length]) st.next++;
         if (rem > 0) st.left = { can: q.can, g: rem, round: round };
       }
     });
     return parts;
   }
+  /* 到了新的吃的順序：冰箱裡還在新清單的罐頭留著，從它的下一個開始；不在清單的就不再排 */
+  function switchLineup(st, t) {
+    var k = lineupAt(t);
+    if (k <= (st.li || 0)) return;
+    st.li = k;
+    var lu = LINEUPS[k].cans;
+    if (st.left && lu.indexOf(st.left.can) < 0) st.left = null;
+    if (st.left) st.left.round = 1;
+    st.next = st.left ? lu.indexOf(st.left.can) + 1 : 0;
+  }
   function cloneSt(st) {
     var b = st.bowl;
-    return { next: st.next, left: st.left ? { can: st.left.can, g: st.left.g, round: st.left.round } : null,
+    return { next: st.next, li: st.li || 0, left: st.left ? { can: st.left.can, g: st.left.g, round: st.left.round } : null,
       bowl: b ? { g: b.g, comp: b.comp.map(function (q) { return { can: q.can, g: q.g }; }), refed: b.refed, round: b.round, t: b.t } : null };
   }
   /* 碗裡沒吃完的（上餐剩的）：把各口味按比例換算成 target 克 */
@@ -647,8 +683,9 @@ input:disabled { opacity: .55; }
 
   function computeAll() {
     var sorted = meals.slice().sort(function (a, b) { return a.t - b.t; });
-    var st = { next: 0, left: null, bowl: null }, list = [], perDay = {};
+    var st = { next: 0, li: 0, left: null, bowl: null }, list = [], perDay = {};
     sorted.forEach(function (m, i) {
+      switchLineup(st, m.t);
       var before = cloneSt(st);
       var parts = serve(st, m.offered, (Array.isArray(m.pick) && m.pick.length) ? m.pick : null, m.prev);
       var lo = Math.max(0, m.offered - m.eaten);
@@ -656,11 +693,12 @@ input:disabled { opacity: .55; }
       var dk = dayKey(m.t); perDay[dk] = (perDay[dk] || 0) + 1;
       list.push({ m: m, n: perDay[dk], seq: i + 1, parts: parts, before: before });
     });
+    switchLineup(st, Date.now());
     return { list: list, st: st };
   }
   function planFor(st, offered, pick, prev) {
     var s = cloneSt(st), parts = serve(s, offered, pick, prev);
-    return { parts: parts, after: s, round: parts.length ? parts[0].round : Math.floor(st.next / 7) + 1 };
+    return { parts: parts, after: s, round: parts.length ? parts[0].round : Math.floor(st.next / LINEUPS[st.li || 0].cans.length) + 1 };
   }
   function canShort(n) { return CANS[n - 1].short; }
   function fmtN(n) { return String(Math.round(n)); }
@@ -791,9 +829,9 @@ input:disabled { opacity: .55; }
     if (draft.pick) {
       var pk = draft.pick, i;
       h += '<div class="hint">第一個口味</div><div class="chips">';
-      for (i = 1; i <= 7; i++) h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '">' + i + '號</button>';
+      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '">' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div><div class="hint">第二個口味（不夠才要選）</div><div class="chips"><button class="chip" data-act="pickB" data-v="0" aria-pressed="' + !pk.b + '">不用</button>';
-      for (i = 1; i <= 7; i++) h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + i + '號</button>';
+      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div>';
       if (pk.b) {
         var pp = pickOf(draft, rest);
@@ -808,7 +846,7 @@ input:disabled { opacity: .55; }
   function curAutoPlan() {
     var cx = draftCtx(computeAll());
     var p = planFor(cx.base, draft.offered, null, cx.prev);
-    p.fallback = (cx.base.next % 7) + 1;
+    var lu0 = LINEUPS[cx.base.li || 0].cans; p.fallback = lu0[cx.base.next % lu0.length];
     return p;
   }
 
@@ -852,8 +890,8 @@ input:disabled { opacity: .55; }
     if (editing) {
       h += '<div class="row between"><span class="pill ok">正在編輯第 ' + n + ' 餐</span><button class="btn ghost small" data-act="cancelEdit">取消編輯</button></div>';
     }
-    h += '<div class="planhead">' + wikuFull(mood, "cat") + '<div class="bubble"><div class="big" id="h-plan">' + (editing ? "第 " + n + " 餐" : "下一餐：第 " + n + " 餐") + '</div><div class="small">第 ' + plan.round + ' 輪 ・ 目前吃到 ' + plan.parts[plan.parts.length - 1].can + "/7 號" + '</div></div></div>';
-    var used = [0, 0, 0, 0, 0, 0, 0];
+    h += '<div class="planhead">' + wikuFull(mood, "cat") + '<div class="bubble"><div class="big" id="h-plan">' + (editing ? "第 " + n + " 餐" : "下一餐：第 " + n + " 餐") + '</div><div class="small">第 ' + plan.round + ' 輪 ・ 目前吃到 ' + plan.parts[plan.parts.length - 1].can + "號" + '</div></div></div>';
+    var used = CANS.map(function () { return 0; });
     all.list.forEach(function (x) {
       if (editing && found && x.seq >= found.seq) return;
       x.parts.forEach(function (p) { if (p.src === "open") used[p.can - 1]++; });
@@ -957,8 +995,61 @@ input:disabled { opacity: .55; }
     return h;
   }
 
+  /* ---------- 歷史紀錄：每個月、每一週 ---------- */
+  function weekStart(t) { var d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+  function md(d) { return (d.getMonth() + 1) + "/" + d.getDate(); }
+  function statsOf(items, keys) {
+    var sc = items.map(function (x) { return x.m.score; }), dn = dayNut(items), w = items.filter(function (x) { return x.m.weight > 0; }).sort(function (a, b) { return a.m.t - b.m.t; });
+    var poop = keys.reduce(function (s, k) { return s + poopOf(k); }, 0), dayN = keys.filter(function (k) { return items.some(function (x) { return dayKey(x.m.t) === k; }); }).length;
+    var sym = function (k) { return items.filter(function (x) { return (x.m.symptoms || []).indexOf(k) >= 0; }).length; };
+    return { meals: items.length, days: dayN, avg: avg(sc), kcalDay: dayN ? dn.eatKcal / dayN : 0, poop: poop, poopDay: dayN ? poop / dayN : 0,
+      wFirst: w.length ? w[0].m.weight : 0, wLast: w.length ? w[w.length - 1].m.weight : 0, vomit: sym("vomit"), loose: sym("loose") };
+  }
+  function statsLine(st) {
+    var h = '<span>共 <b class="num">' + st.meals + '</b> 餐</span><span>平均食欲 <b class="num">' + fmt1(st.avg) + '</b> 分</span>' +
+      '<span>每天約 <b class="num">' + fmtN(st.kcalDay) + '</b> 大卡</span><span>大便 <b class="num">' + st.poop + '</b> 條' + (st.days ? '（每天 ' + fmt1(st.poopDay) + '）' : '') + '</span>';
+    if (st.wLast) h += '<span>體重 <b class="num">' + fmtW(st.wLast) + '</b> kg' + (st.wFirst !== st.wLast ? '（' + (st.wLast > st.wFirst ? "+" : "") + fmtW(st.wLast - st.wFirst) + '）' : '') + '</span>';
+    if (st.vomit) h += '<span>嘔吐 <b class="num">' + st.vomit + '</b> 次</span>';
+    if (st.loose) h += '<span>軟便 <b class="num">' + st.loose + '</b> 次</span>';
+    return h;
+  }
+  function historyHtml(all) {
+    var byMonth = {}, months = [];
+    all.list.forEach(function (x) { var d = new Date(x.m.t), mk = d.getFullYear() + "-" + p2(d.getMonth() + 1); if (!byMonth[mk]) { byMonth[mk] = []; months.push(mk); } byMonth[mk].push(x); });
+    months.sort().reverse();
+    var h = "", thisMonth = months[0];
+    months.forEach(function (mk) {
+      var items = byMonth[mk], y = Number(mk.slice(0, 4)), mo = Number(mk.slice(5)) - 1;
+      var first = new Date(y, mo, 1), last = new Date(y, mo + 1, 0), mkeys = [];
+      for (var d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) mkeys.push(dayKey(d.getTime()));
+      h += '<section class="card"><details class="hmonth"' + (mk === thisMonth ? " open" : "") + '><summary><h2>' + y + ' 年 ' + (mo + 1) + ' 月</h2><span class="hint">' + statsOf(items, mkeys).days + ' 天有紀錄</span></summary>';
+      h += '<div class="hstats hmsum">' + statsLine(statsOf(items, mkeys)) + '</div><div class="hweeks">';
+      var ws = weekStart(last.getTime());
+      while (ws.getTime() + 7 * 864e5 > first.getTime()) {
+        var cells = "", wkeys = [], wItems = [];
+        for (var i = 0; i < 7; i++) {
+          var dd = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i), k = dayKey(dd.getTime()), inM = dd.getMonth() === mo;
+          var di = items.filter(function (x) { return dayKey(x.m.t) === k; });
+          if (inM) { wkeys.push(k); wItems = wItems.concat(di); }
+          var a = avg(di.map(function (x) { return x.m.score; }));
+          cells += '<i class="' + (!inM ? "out" : di.length ? "on" : "") + '"' + (di.length ? ' style="--sc:var(--s' + Math.max(0, Math.min(4, Math.round(a))) + ')"' : '') + ' title="' + md(dd) + (di.length ? " 平均 " + fmt1(a) + " 分" : "") + '">' +
+            '<span>' + DAYN[dd.getDay()] + '</span><span>' + (di.length ? fmt1(a) : dd.getDate()) + '</span></i>';
+        }
+        if (wItems.length || wkeys.some(function (k) { return poopOf(k); })) {
+          var a0 = new Date(wkeys[0] + "T00:00"), a1 = new Date(wkeys[wkeys.length - 1] + "T00:00");
+          h += '<div class="hweek"><div class="hd"><b>' + md(a0) + '（' + DAYN[a0.getDay()] + '）～ ' + md(a1) + '（' + DAYN[a1.getDay()] + '）</b><span class="hint">' + statsOf(wItems, wkeys).days + ' 天有紀錄</span></div>' +
+            '<div class="hcells">' + cells + '</div><div class="hstats">' + statsLine(statsOf(wItems, wkeys)) + '</div></div>';
+        }
+        ws = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() - 7);
+      }
+      h += '</div></details></section>';
+    });
+    return h + '<div class="hint" style="text-align:center">格子顏色是當天平均食欲，數字是平均分數；熱量是有紀錄那幾天的平均。</div>';
+  }
+
   function logTab(all) {
-    var h = "";
+    var h = '<div class="lview"><button class="chip" data-act="logView" data-v="days" aria-pressed="' + (logView === "days") + '">每天</button><button class="chip" data-act="logView" data-v="history" aria-pressed="' + (logView === "history") + '">歷史紀錄（每月・每週）</button></div>';
+    if (all.list.length && logView === "history") return h + historyHtml(all);
     if (!all.list.length) {
       return '<section class="card"><div class="empty">' + wikuFull(3) + '<b>還沒有紀錄</b><span>到「今天」記下 WIKU 的第一餐，這裡就會出現每天的紀錄。</span></div></section>';
     }
@@ -1006,23 +1097,24 @@ input:disabled { opacity: .55; }
   }
 
   function cansTab(all) {
-    var st = all.st, curIdx = st.left ? st.left.can - 1 : (st.next % 7);
+    var st = all.st, lu = LINEUPS[st.li || 0].cans;
     // 目前這一輪各罐狀態
-    var nextOpen = st.next % 7;
-    var round = Math.floor(st.next / 7) + 1;
-    var scores = {}, usedC = [0, 0, 0, 0, 0, 0, 0];
+    var nextPos = st.next % lu.length, nextCan = lu[nextPos];
+    var round = Math.floor(st.next / lu.length) + 1;
+    var scores = {}, usedC = CANS.map(function () { return 0; });
     all.list.forEach(function (x) { x.parts.forEach(function (p) { if (p.src === "open") usedC[p.can - 1]++; (scores[p.can] = scores[p.can] || []).push(x.m.score); }); });
     var h = '<section class="card"><div class="row between"><h2>吃的順序</h2><span class="pill ok">第 <b class="num">' + round + '</b> 輪</span></div>' +
-      '<div class="hint">1～7 號依序吃，每個口味開一罐吃完再換下一個。吃到 7 號算一輪，第二輪從 1 號重新開始。</div>';
+      '<div class="hint">' + lu.map(function (n) { return n + "號"; }).join(" → ") + " 依序吃，每個口味開一罐吃完再換下一個。全部吃過一次算一輪，再從 " + lu[0] + ' 號開始。</div>';
     if (st.bowl) h += '<div class="fridge-note">上一餐剩的：<b>' + st.bowl.comp.map(function (q) { return q.can + "號【" + esc(canShort(q.can)) + '】<span class="num"> ' + q.g + 'g</span>'; }).join(" + ") + '</b>，下一餐可以先給牠吃，或倒掉。</div>';
     if (st.left) h += '<div class="fridge-note">冰箱裡有：<b>' + st.left.can + "號【" + esc(canShort(st.left.can)) + '】<span class="num"> ' + st.left.g + 'g</span></b>，下一餐先用它。</div>';
-    CANS.forEach(function (c, i) {
-      var fridgeNow = !!st.left && (st.left.can - 1) === i;
-      var isNow = fridgeNow || (!st.left && nextOpen === i);
-      var passed = !fridgeNow && i < nextOpen;
+    lu.forEach(function (cn, pos) {
+      var c = CANS[cn - 1], i = cn - 1;
+      var fridgeNow = !!st.left && st.left.can === cn;
+      var isNow = fridgeNow || (!st.left && nextCan === cn);
+      var passed = !fridgeNow && pos < nextPos;
       var a = avg(scores[c.n] || []);
       var left = settings.stock[i] - usedC[i];
-      var stText = fridgeNow ? "冰箱有剩，下一餐先吃" : nextOpen === i ? (st.left ? "冰箱的用完就開這個" : "下一個要開") : passed ? "本輪已吃過" : "還沒輪到";
+      var stText = fridgeNow ? "冰箱有剩，下一餐先吃" : nextCan === cn ? (st.left ? "冰箱的用完就開這個" : "下一個要開") : passed ? "本輪已吃過" : "還沒輪到";
       h += '<div class="can ' + (isNow ? "now" : passed ? "done" : "") + '"><div class="no num">' + c.n + '</div>' +
         '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <b class="num">' + left + '</b> / <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + settings.stock[i] + '" aria-label="' + c.n + '號總共幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
         '<details class="more" data-more="' + i + '"' + (moreOpen[i] ? " open" : "") + '><summary>熱量、水分' + (c.est ? '（推估）' : '') + '</summary><div class="st">熱量 <input class="stk num" id="nk' + i + '" data-nk="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="300" step="0.1" value="' + (Math.round(settings.nut[i].k * 1000) / 10) + '" aria-label="' + c.n + '號每100克熱量"> 大卡/100g</div><div class="st">水分 <input class="stk num" id="nw' + i + '" data-nw="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="99" step="0.5" value="' + settings.nut[i].w + '" aria-label="' + c.n + '號水分百分比"> %' + (c.est ? ' <b class="estb">推估</b>' : '') + '</div><div class="st">' + esc(c.src) + '</div></details></div>' +
@@ -1041,7 +1133,7 @@ input:disabled { opacity: .55; }
       '<li>食物不用額外加水。</li>' +
       '<li>每餐預設 50g。開一罐，挖出貓咪需要的量，剩下的另外挖到保鮮盒冰起來。</li>' +
       '<li>下一餐先把冰箱的量拿出來回溫，不夠再開下一個口味補到份量，剩下的再冰起來。</li>' +
-      '<li>每個口味開一罐吃完後，換開下一個。1～7 號依序吃，吃完 7 號是第一輪，第二輪從 1 號開始。每罐依序切成份量用完，例如 90g 就是 50g + 40g。</li>' +
+      '<li>每個口味開一罐吃完後，換開下一個。照「吃的順序」依序吃，全部吃過一次是一輪，再從第一個開始。每罐依序切成份量用完，例如 90g 就是 50g + 40g。</li>' +
       '<li>如果連續 2～3 餐都吃完，份量可以 +5g（55g），再 2～3 餐吃完再 +5g（60g）。沒吃完就遞減。</li>' +
       '<li>初期 7～14 天，每餐記錄食欲分數和吃的量，遇到不愛吃的也要記。</li></ol>' +
       '<ul><li>4 分：喜歡吃</li><li>3 分：吃剩 1～2 口</li><li>2 分：吃一半</li><li>1 分：只吃 1～2 口</li><li>0 分：完全不愛</li></ul></details></section>';
@@ -1185,7 +1277,7 @@ input:disabled { opacity: .55; }
     var str = function (a) { return Array.isArray(a) ? a.filter(function (x) { return typeof x === "string"; }).slice(0, 10) : []; };
     var out = { id: m.id.slice(0, 40), t: m.t, offered: m.offered, eaten: m.eaten, score: m.score, extras: str(m.extras), symptoms: str(m.symptoms), note: typeof m.note === "string" ? m.note.slice(0, 500) : "" };
     if (Array.isArray(m.pick)) {
-      var pk = m.pick.filter(function (q) { return q && q.can >= 1 && q.can <= 7 && q.can % 1 === 0 && q.g > 0; }).slice(0, 2).map(function (q) { return { can: q.can, g: q.g }; });
+      var pk = m.pick.filter(function (q) { return q && q.can >= 1 && q.can <= CANS.length && q.can % 1 === 0 && q.g > 0; }).slice(0, 2).map(function (q) { return { can: q.can, g: q.g }; });
       if (pk.length) out.pick = pk;
     }
     if (m.prev === "eat" || m.prev === "toss") out.prev = m.prev;
@@ -1414,6 +1506,7 @@ input:disabled { opacity: .55; }
       if (i >= 0) arr.splice(i, 1); else arr.push(k);
       render(); return;
     }
+    if (act === "logView") { logView = el.getAttribute("data-v"); lsSet("wiku.logview", logView); render(); window.scrollTo(0, 0); return; }
     if (act === "prev") {
       draft.prev = el.getAttribute("data-v"); draft.prevTouched = true;
       if (!draft.id) { draft.offTouched = false; var cp = draftCtx(computeAll()); draft.offered = cp.prev === "eat" ? cp.bowl.g : settings.portion; }
