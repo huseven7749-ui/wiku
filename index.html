@@ -331,6 +331,9 @@ input:disabled { opacity: .55; }
   ];
   function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
   function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || []); }
+  /* 顯示用的號碼：照最新的清單（盤點時拍照的順序）；不在清單裡的舊罐頭不顯示號碼 */
+  function canNum(can) { var L = LINEUPS[LINEUPS.length - 1], a = L.cans.concat(L.must || []), i = a.indexOf(can); return i >= 0 ? i + 1 : 0; }
+  function no(can) { var n = canNum(can); return n ? n + "號" : ""; }
   function mustOf(t) { return LINEUPS[lineupAt(t)].must || []; }
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
   var SCORES = [
@@ -749,7 +752,7 @@ input:disabled { opacity: .55; }
     return '<div class="nutri"><div><span class="label">今日吃進熱量</span><div><b class="big num">' + fmtN(d.eatKcal) + '</b> 大卡</div><span class="hint">供給 ' + fmtN(d.offKcal) + ' 大卡</span></div>' +
       '<div><span class="label">今日吃進水份</span><div><b class="big num">' + fmtN(d.eatWater) + '</b> g</div><span class="hint">含水率 ' + fmtN(d.pct) + '%</span></div></div>';
   }
-  function partsLabel(parts) { return parts.map(function (p) { return (p.src === "bowl" ? "上餐剩 " : "") + p.can + "號" + canShort(p.can) + " " + p.g + "g"; }).join(" + "); }
+  function partsLabel(parts) { return parts.map(function (p) { return (p.src === "bowl" ? "上餐剩 " : "") + no(p.can) + canShort(p.can) + " " + p.g + "g"; }).join(" + "); }
 
   /* ---------- 草稿 ---------- */
   function newDraft() {
@@ -820,18 +823,18 @@ input:disabled { opacity: .55; }
     plan.parts.forEach(function (p) {
       var c = CANS[p.can - 1];
       if (p.src === "bowl") {
-        h += '<li><span class="tag bowl">上餐剩的</span><div><span class="nm">' + p.can + "號【" + esc(c.short) + '】</span> <span class="g num">' + p.g + 'g</span><span class="why">上一餐沒吃完的，先給牠吃</span></div></li>';
+        h += '<li><span class="tag bowl">上餐剩的</span><div><span class="nm">' + no(p.can) + "【" + esc(c.short) + '】</span> <span class="g num">' + p.g + 'g</span><span class="why">上一餐沒吃完的，先給牠吃</span></div></li>';
       } else if (p.src === "fridge") {
-        h += '<li><span class="tag fridge">冰箱回溫</span><div><span class="nm">' + p.can + "號【" + esc(c.short) + '】</span> <span class="g num">' + p.g + 'g</span><span class="why">拿出保鮮盒裡的量，回溫後使用' + ((plan.after.left && plan.after.left.can === p.can) ? "" : "，這" + c.kind + "到這餐用完") + '</span></div></li>';
+        h += '<li><span class="tag fridge">冰箱回溫</span><div><span class="nm">' + no(p.can) + "【" + esc(c.short) + '】</span> <span class="g num">' + p.g + 'g</span><span class="why">拿出保鮮盒裡的量，回溫後使用' + ((plan.after.left && plan.after.left.can === p.can) ? "" : "，這" + c.kind + "到這餐用完") + '</span></div></li>';
       } else {
-        h += '<li><span class="tag open">開' + p.can + "號" + c.kind + '</span><div><span class="nm">【' + esc(c.short) + '】<span class="num"> 整' + c.kind + settings.sizes[p.can - 1] + 'g</span> ・ 挖 <span class="g num">' + p.g + 'g</span>' +
+        h += '<li><span class="tag open">開' + no(p.can) + c.kind + '</span><div><span class="nm">【' + esc(c.short) + '】<span class="num"> 整' + c.kind + settings.sizes[p.can - 1] + 'g</span> ・ 挖 <span class="g num">' + p.g + 'g</span>' +
           '<span class="why">庫存開罐前剩 <b class="num">' + (settings.stock[p.can - 1] - used[p.can - 1]) + '</b> ' + c.kind + ((settings.stock[p.can - 1] - used[p.can - 1]) <= 0 ? "，沒有庫存了，記得補貨" : "") + '</span>' +
           (p.rem > 0 ? '<span class="why">剩下 <b class="num">' + p.rem + 'g</b> 從' + c.kind + '中另外挖到保鮮盒冰起來</span>' : '<span class="why">這' + c.kind + '剛好用完</span>') + '</div></li>';
       }
     });
     var last = plan.parts[plan.parts.length - 1];
     if (last && last.src === "fridge" && plan.after.left) {
-      h += '<li><span class="tag keep">放回冰箱</span><div><span class="nm">' + plan.after.left.can + "號【" + esc(canShort(plan.after.left.can)) + '】</span> <span class="g num">' + plan.after.left.g + 'g</span><span class="why">沒碰到的部分繼續冰回冰箱</span></div></li>';
+      h += '<li><span class="tag keep">放回冰箱</span><div><span class="nm">' + no(plan.after.left.can) + "【" + esc(canShort(plan.after.left.can)) + '】</span> <span class="g num">' + plan.after.left.g + 'g</span><span class="why">沒碰到的部分繼續冰回冰箱</span></div></li>';
     }
     return h + "</ul>";
   }
@@ -857,7 +860,7 @@ input:disabled { opacity: .55; }
     var b = ctx.bowl;
     if (!b) return "";
     var when = dayKey(b.t) === dayKey(Date.now()) ? hm(b.t) : dayLabel(b.t) + " " + hm(b.t);
-    var lbl = b.comp.map(function (q) { return q.can + "號【" + esc(canShort(q.can)) + "】" + q.g + "g"; }).join(" + ");
+    var lbl = b.comp.map(function (q) { return no(q.can) + "【" + esc(canShort(q.can)) + "】" + q.g + "g"; }).join(" + ");
     return '<div class="leftover' + (b.refed ? " warn" : "") + '"><div><b>上一餐（' + when + '）剩 <span class="num">' + b.g + '</span>g 沒吃完</b><span class="why">' + lbl + '</span>' +
       (b.refed ? '<span class="alert">這份剩的已經重新餵過一次還是沒吃完，建議倒掉，直接換下一個順序。</span>' : '<span class="why">先把剩的給牠吃，或倒掉直接換下一個順序。</span>') + '</div>' +
       '<div class="quick"><button class="chip" data-act="prev" data-v="eat" aria-pressed="' + (ctx.prev === "eat") + '">給牠吃剩的</button>' +
@@ -870,9 +873,9 @@ input:disabled { opacity: .55; }
     if (draft.pick) {
       var pk = draft.pick, i;
       h += '<div class="hint">第一個口味</div><div class="chips">';
-      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '">' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
+      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + no(i) + ' ' + esc(CANS[i - 1].short) + '">' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div><div class="hint">第二個口味（不夠才要選）</div><div class="chips"><button class="chip" data-act="pickB" data-v="0" aria-pressed="' + !pk.b + '">不用</button>';
-      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + i + '號 ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
+      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + no(i) + ' ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + no(i) + ' ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div>';
       if (pk.b) {
         var pp = pickOf(draft, rest);
@@ -931,7 +934,7 @@ input:disabled { opacity: .55; }
     if (editing) {
       h += '<div class="row between"><span class="pill ok">正在編輯第 ' + n + ' 餐</span><button class="btn ghost small" data-act="cancelEdit">取消編輯</button></div>';
     }
-    h += '<div class="planhead">' + wikuFull(mood, "cat") + '<div class="bubble"><div class="big" id="h-plan">' + (editing ? "第 " + n + " 餐" : "下一餐：第 " + n + " 餐") + '</div><div class="small">第 ' + plan.round + ' 輪 ・ 目前吃到 ' + plan.parts[plan.parts.length - 1].can + "號" + '</div></div></div>';
+    h += '<div class="planhead">' + wikuFull(mood, "cat") + '<div class="bubble"><div class="big" id="h-plan">' + (editing ? "第 " + n + " 餐" : "下一餐：第 " + n + " 餐") + '</div><div class="small">第 ' + plan.round + ' 輪 ・ 目前吃到 ' + no(plan.parts[plan.parts.length - 1].can) + esc(canShort(plan.parts[plan.parts.length - 1].can)) + '</div></div></div>';
     var used = CANS.map(function () { return 0; });
     all.list.forEach(function (x) {
       if (editing && found && x.seq >= found.seq) return;
@@ -1139,10 +1142,10 @@ input:disabled { opacity: .55; }
   }
 
   function canRowHtml(c, i, cls, stText, a, left) {
-    return '<div class="can ' + cls + '"><div class="no num">' + c.n + '</div>' +
-        '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + Math.max(0, left) + '" aria-label="' + c.n + '號現在剩幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
-        '<details class="more" data-more="' + i + '"' + (moreOpen[i] ? " open" : "") + '><summary>熱量、水分' + (c.est ? '（推估）' : '') + '</summary><div class="st">熱量 <input class="stk num" id="nk' + i + '" data-nk="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="300" step="0.1" value="' + (Math.round(settings.nut[i].k * 1000) / 10) + '" aria-label="' + c.n + '號每100克熱量"> 大卡/100g</div><div class="st">水分 <input class="stk num" id="nw' + i + '" data-nw="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="99" step="0.5" value="' + settings.nut[i].w + '" aria-label="' + c.n + '號水分百分比"> %' + (c.est ? ' <b class="estb">推估</b>' : '') + '</div><div class="st">' + esc(c.src) + '</div></details></div>' +
-        '<label class="gw"><input class="num" id="size' + i + '" type="number" inputmode="numeric" min="1" max="400" data-size="' + i + '"' + (isLocked() ? " disabled" : "") + ' value="' + settings.sizes[i] + '" aria-label="' + c.n + '號每' + c.kind + '重量（克）"><span class="hint">g</span></label></div>';
+    return '<div class="can ' + cls + '"><div class="no num">' + (canNum(c.n) || "") + '</div>' +
+        '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + Math.max(0, left) + '" aria-label="' + no(c.n) + '現在剩幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
+        '<details class="more" data-more="' + i + '"' + (moreOpen[i] ? " open" : "") + '><summary>熱量、水分' + (c.est ? '（推估）' : '') + '</summary><div class="st">熱量 <input class="stk num" id="nk' + i + '" data-nk="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="300" step="0.1" value="' + (Math.round(settings.nut[i].k * 1000) / 10) + '" aria-label="' + no(c.n) + '每100克熱量"> 大卡/100g</div><div class="st">水分 <input class="stk num" id="nw' + i + '" data-nw="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="99" step="0.5" value="' + settings.nut[i].w + '" aria-label="' + no(c.n) + '水分百分比"> %' + (c.est ? ' <b class="estb">推估</b>' : '') + '</div><div class="st">' + esc(c.src) + '</div></details></div>' +
+        '<label class="gw"><input class="num" id="size' + i + '" type="number" inputmode="numeric" min="1" max="400" data-size="' + i + '"' + (isLocked() ? " disabled" : "") + ' value="' + settings.sizes[i] + '" aria-label="' + no(c.n) + '每' + c.kind + '重量（克）"><span class="hint">g</span></label></div>';
   }
   function cansTab(all) {
     var st = all.st, lu = LINEUPS[st.li || 0].cans;
@@ -1152,9 +1155,9 @@ input:disabled { opacity: .55; }
     var scores = {}, usedC = CANS.map(function () { return 0; });
     all.list.forEach(function (x) { x.parts.forEach(function (p) { if (p.src === "open" && x.m.t >= (settings.stockT[p.can - 1] || 0)) usedC[p.can - 1]++; (scores[p.can] = scores[p.can] || []).push(x.m.score); }); });
     var h = '<section class="card"><div class="row between"><h2>吃的順序</h2><span class="pill ok">第 <b class="num">' + round + '</b> 輪</span></div>' +
-      '<div class="hint">' + lu.map(function (n) { return n + "號"; }).join(" → ") + " 依序吃，每個口味開一罐吃完再換下一個。全部吃過一次算一輪，再從 " + lu[0] + ' 號開始。</div>';
-    if (st.bowl) h += '<div class="fridge-note">上一餐剩的：<b>' + st.bowl.comp.map(function (q) { return q.can + "號【" + esc(canShort(q.can)) + '】<span class="num"> ' + q.g + 'g</span>'; }).join(" + ") + '</b>，下一餐可以先給牠吃，或倒掉。</div>';
-    if (st.left) h += '<div class="fridge-note">冰箱裡有：<b>' + st.left.can + "號【" + esc(canShort(st.left.can)) + '】<span class="num"> ' + st.left.g + 'g</span></b>，下一餐先用它。</div>';
+      '<div class="hint">' + lu.map(function (n) { return no(n); }).join(" → ") + " 依序吃，每個口味開一罐吃完再換下一個。全部吃過一次算一輪，再從 " + no(lu[0]) + '開始。</div>';
+    if (st.bowl) h += '<div class="fridge-note">上一餐剩的：<b>' + st.bowl.comp.map(function (q) { return no(q.can) + "【" + esc(canShort(q.can)) + '】<span class="num"> ' + q.g + 'g</span>'; }).join(" + ") + '</b>，下一餐可以先給牠吃，或倒掉。</div>';
+    if (st.left) h += '<div class="fridge-note">冰箱裡有：<b>' + no(st.left.can) + "【" + esc(canShort(st.left.can)) + '】<span class="num"> ' + st.left.g + 'g</span></b>，下一餐先用它。</div>';
     lu.forEach(function (cn, pos) {
       var c = CANS[cn - 1], i = cn - 1;
       var fridgeNow = !!st.left && st.left.can === cn;
