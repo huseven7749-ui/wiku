@@ -321,13 +321,14 @@ input:disabled { opacity: .55; }
     { n: 8, short: "法麗全照護-雞+鮪魚慕斯", name: "法黑罐鮪魚", g: 80, kind: "罐", kcal: 85, water: 83, est: false, src: "Purrmaster 營養資料庫（引用 pettric 商品頁）：85 大卡／100g，水分 83% 以下；法麗官網沒有單一口味資料，請對照罐身" },
     { n: 9, short: "唯美味-美味樂透雞(雞胸肉)", name: "唯美樂透雞", g: 85, kind: "罐", kcal: 65.9, water: 87, est: false, src: "唯美味標示：56 大卡／85g，水分最多 87%（美味樂透雞）" },
     { n: 10, short: "波菲特-安心鶉(鵪鶉)", name: "波菲特鶉", g: 80, kind: "罐", kcal: 106, water: 79.3, est: false, src: "波菲特標示：106 大卡／100g，水分 79.3% 以下，淨重 80g" },
-    { n: 11, short: "GUSSTO惡魔喵6號-火雞+鮪魚", name: "惡魔喵6號", g: 85, kind: "餐包", kcal: 96, water: 80, est: false, src: "GUSSTO 標示：95.96 大卡／100g，水分 80%，淨重 85g" }
+    { n: 11, short: "GUSSTO惡魔喵6號-火雞+鮪魚", name: "惡魔喵6號", g: 85, kind: "餐包", kcal: 96, water: 80, est: false, src: "GUSSTO 標示：95.96 大卡／100g，水分 80%，淨重 85g" },
+    { n: 12, short: "凱特-早餐吸喵(雞肉+南瓜)", name: "凱特吸喵", g: 85, kind: "餐包", kcal: 68.2, water: 86, est: false, src: "凱特美廚標示：58 大卡／85g（677 大卡／公斤），水分最多 86%" }
   ];
   /* 吃的順序：from 之後開始用這組。舊紀錄照當時的順序算，不會被改掉 */
   var LINEUPS = [
     { from: 0, cans: [1, 2, 3, 4, 5, 6, 7] },
     { from: 1793182500000, cans: [7, 8] },  // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
-    { from: 1793283000000, cans: [5, 4, 9, 6, 2], must: [10, 11, 7] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
+    { from: 1793283000000, cans: [12, 4, 9, 6, 2], must: [10, 11, 7] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
   ];
   function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
   function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || []); }
@@ -394,6 +395,7 @@ input:disabled { opacity: .55; }
     if (s && Array.isArray(s.stock)) out.stock = CANS.map(function (c, i) { var v = s.stock[i]; return v >= 0 ? v : 3; });
     out.xstock = { meat: 0 };
     if (s && s.xstock && s.xstock.meat >= 0) out.xstock.meat = Math.floor(s.xstock.meat);
+    if (s && s.xstock && s.xstock.meatT > 0) out.xstock.meatT = s.xstock.meatT;
     out.stockT = CANS.map(function (c, i) { var v = s && Array.isArray(s.stockT) ? s.stockT[i] : 0; return v > 0 ? v : 0; });
     if (s && (s.nutV === 2 || s.nutV === 3) && Array.isArray(s.nut)) out.nut = CANS.map(function (c, i) { var v = s.nut[i]; return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
     /* v3：克勞德 05 號改用包裝實際標示；舊的推估值（90／80）沒被改過就換成新的 */
@@ -734,15 +736,18 @@ input:disabled { opacity: .55; }
     parts.forEach(function (p) { var n = settings.nut[p.can - 1]; kcal += p.g * n.k; water += p.g * n.w / 100; g += p.g; });
     return { kcal: kcal, water: water, g: g };
   }
+  /* 安森好肉：25g 一包（虱目魚10g 420.8、牧野雞10g 445、鴕鳥5g 445 大卡/100g）＝109.3 大卡，約 4.37 大卡/克；包裝沒寫水分，算 0 */
+  var MEAT_K = 109.3 / 25;
+  function meatKcal(m) { return (m.extras || []).indexOf("meat") >= 0 && m.meatG > 0 ? m.meatG * MEAT_K : 0; }
   function mealNut(x) {
-    var t = partsNut(x.parts), r = x.m.offered ? x.m.eaten / x.m.offered : 0;
-    return { offKcal: t.kcal, offWater: t.water, eatKcal: t.kcal * r, eatWater: t.water * r };
+    var t = partsNut(x.parts), r = x.m.offered ? x.m.eaten / x.m.offered : 0, mk = meatKcal(x.m);
+    return { offKcal: t.kcal + mk, offWater: t.water, eatKcal: t.kcal * r + mk, eatWater: t.water * r };
   }
   function dayNut(items) {
     var d = { offKcal: 0, eatKcal: 0, offWater: 0, eatWater: 0, eatG: 0 };
     items.forEach(function (x) {
       var n = mealNut(x), fresh = partsNut(x.parts.filter(function (p) { return p.src !== "bowl"; }));  // 供給只算新挖的，上餐剩的不重複算
-      d.offKcal += fresh.kcal; d.eatKcal += n.eatKcal; d.offWater += fresh.water; d.eatWater += n.eatWater; d.eatG += x.m.eaten;
+      d.offKcal += fresh.kcal + meatKcal(x.m); d.eatKcal += n.eatKcal; d.offWater += fresh.water; d.eatWater += n.eatWater; d.eatG += x.m.eaten;
     });
     d.pct = d.eatG > 0 ? d.eatWater / d.eatG * 100 : 0;
     return d;
@@ -756,7 +761,7 @@ input:disabled { opacity: .55; }
 
   /* ---------- 草稿 ---------- */
   function newDraft() {
-    return { id: null, t: Date.now(), tAuto: true, offered: settings.portion, offTouched: false, eaten: null, eTouched: false, score: null, extras: [], symptoms: [], note: "", pick: null, prev: null, prevTouched: false, weight: null };
+    return { id: null, t: Date.now(), tAuto: true, offered: settings.portion, offTouched: false, eaten: null, eTouched: false, score: null, extras: [], symptoms: [], note: "", pick: null, prev: null, prevTouched: false, weight: null, meatG: 5 };
   }
   function pickOf(d, total) {
     if (!d.pick) return null;
@@ -772,7 +777,7 @@ input:disabled { opacity: .55; }
     return { a: a.can, b: b && b.can !== a.can ? b.can : 0, ag: a.g };
   }
   function draftFromMeal(m) {
-    return { id: m.id, t: m.t, tAuto: false, offered: m.offered, offTouched: true, eaten: m.eaten, eTouched: true, score: m.score, extras: (m.extras || []).slice(), symptoms: (m.symptoms || []).slice(), note: m.note || "", prev: m.prev || "toss", prevTouched: true, weight: typeof m.weight === "number" ? m.weight : null, pick: (Array.isArray(m.pick) && m.pick.length) ? pickFromParts(m.pick) : null };
+    return { id: m.id, t: m.t, tAuto: false, offered: m.offered, offTouched: true, eaten: m.eaten, eTouched: true, score: m.score, extras: (m.extras || []).slice(), symptoms: (m.symptoms || []).slice(), note: m.note || "", meatG: m.meatG > 0 ? m.meatG : 5, prev: m.prev || "toss", prevTouched: true, weight: typeof m.weight === "number" ? m.weight : null, pick: (Array.isArray(m.pick) && m.pick.length) ? pickFromParts(m.pick) : null };
   }
   /* 目前這份草稿的狀況：碗裡有沒有上餐剩的、要吃還是倒、扣掉剩的之後還要湊多少 */
   function draftCtx(all) {
@@ -987,7 +992,13 @@ input:disabled { opacity: .55; }
 
     h += '<div class="field"><span class="label">備用區（有用到就點）</span><div class="chips">';
     EXTRAS.forEach(function (x) { h += '<button class="chip" data-act="toggle" data-l="extras" data-k="' + x.k + '" aria-pressed="' + (draft.extras.indexOf(x.k) >= 0) + '">' + x.label + '</button>'; });
-    h += '</div></div>';
+    h += '</div>';
+    if (draft.extras.indexOf("meat") >= 0) {
+      h += '<div class="hint">安森好肉給了幾克（算進熱量）</div><div class="stepper"><button data-act="meatStep" data-d="-5" aria-label="安森好肉減5克">−5</button><button data-act="meatStep" data-d="-1" aria-label="安森好肉減1克">−1</button>' +
+        '<div class="val"><span class="num">' + draft.meatG + '</span><span class="u">g ≈ ' + fmtN(draft.meatG * MEAT_K) + ' 大卡</span></div>' +
+        '<button data-act="meatStep" data-d="1" aria-label="安森好肉加1克">+1</button><button data-act="meatStep" data-d="5" aria-label="安森好肉加5克">+5</button></div>';
+    }
+    h += '</div>';
 
     h += '<div class="field"><span class="label">拉吐狀況</span><div class="chips">';
     SYMPTOMS.forEach(function (x) { h += '<button class="chip warn" data-act="toggle" data-l="symptoms" data-k="' + x.k + '" aria-pressed="' + (draft.symptoms.indexOf(x.k) >= 0) + '">' + x.label + '</button>'; });
@@ -1011,7 +1022,7 @@ input:disabled { opacity: .55; }
       }
       h += poopBox(today) +
         '<button class="btn block" data-act="saveImg" data-k="' + today + '">一鍵保存今日圖片</button>' +
-        '<div class="hint">最後一餐記完後按這裡，會把今天每餐的食欲和吃的量做成一張圖。熱量和水份依罐頭標示估算，不含備用區。</div>' + nutriBox(tm) + previewHtml(today) + '<div class="mini">';
+        '<div class="hint">最後一餐記完後按這裡，會把今天每餐的食欲和吃的量做成一張圖。熱量和水份依罐頭標示估算，含安森好肉，不含凍乾。</div>' + nutriBox(tm) + previewHtml(today) + '<div class="mini">';
       tm.forEach(function (x) {
         h += '<button class="it" data-act="edit" data-id="' + esc(x.m.id) + '" aria-label="編輯第' + x.n + '餐"><span class="badge num" style="--sc:var(--s' + x.m.score + ')">' + x.m.score + '</span><div class="tx">第' + x.n + '餐 ・ ' + hm(x.m.t) + ' ・ ' + scoreFull(x.m.score) + '<span>' + esc(partsLabel(x.parts)) + ' ・ 吃 ' + x.m.eaten + 'g ・ ' + fmtN(mealNut(x).eatKcal) + ' 大卡' + (x.m.weight > 0 ? ' ・ 體重 ' + fmtW(x.m.weight) + 'kg' : '') + '</span></div><span class="chev">編輯 ›</span></button>';
       });
@@ -1031,7 +1042,7 @@ input:disabled { opacity: .55; }
     var h = '<article class="meal"><div class="l1"><span class="badge num" style="--sc:var(--s' + m.score + ')" title="' + scoreFull(m.score) + '">' + m.score + '</span>' +
       '<div class="ttl"><b>第' + x.n + '餐 ・ ' + scoreFull(m.score) + '</b><span>' + esc(partsLabel(x.parts)) + '</span></div><span class="tm" title="用餐時間">' + hm(m.t) + '</span></div>' +
       '<div class="row"><span class="pill">吃 <b class="num">' + m.eaten + '</b> / ' + m.offered + ' g（' + pct + '%）</span><span class="pill">熱量 <b class="num">' + fmtN(mn.eatKcal) + '</b> 大卡</span><span class="pill">水份 <b class="num">' + fmtN(mn.eatWater) + '</b> g</span>' + (m.weight > 0 ? '<span class="pill ok">體重 <b class="num">' + fmtW(m.weight) + '</b> kg</span>' : '') + '</div>';
-    var tags = (tossedText(x) ? ['<span class="t2">' + tossedText(x) + '</span>'] : []).concat((m.extras || []).map(function (k) { return '<span class="t2">' + esc(labelOf(EXTRAS, k)) + '</span>'; })).concat((m.symptoms || []).map(function (k) { return '<span class="t2 warn">' + esc(labelOf(SYMPTOMS, k)) + '</span>'; }));
+    var tags = (tossedText(x) ? ['<span class="t2">' + tossedText(x) + '</span>'] : []).concat((m.extras || []).map(function (k) { return '<span class="t2">' + esc(labelOf(EXTRAS, k)) + (k === "meat" && m.meatG > 0 ? " " + m.meatG + "g" : "") + '</span>'; })).concat((m.symptoms || []).map(function (k) { return '<span class="t2 warn">' + esc(labelOf(SYMPTOMS, k)) + '</span>'; }));
     if (tags.length) h += '<div class="tagrow">' + tags.join("") + '</div>';
     if (m.note) h += '<div class="note">' + esc(m.note) + '</div>';
     var armed = armedDel === m.id;
@@ -1141,6 +1152,12 @@ input:disabled { opacity: .55; }
     return '<div class="field"><span class="hint">請長按全選後複製：</span><textarea id="copybox" class="copybox" readonly rows="6">' + esc(openCopy.text) + '</textarea></div>';
   }
 
+  function meatStockHtml(all) {
+    var xs = settings.xstock || {}, t0 = xs.meatT || 0, used = 0;
+    all.list.forEach(function (x) { if (x.m.t >= t0) used += (x.m.extras || []).indexOf("meat") >= 0 && x.m.meatG > 0 ? x.m.meatG : 0; });
+    var leftG = Math.max(0, (xs.meat || 0) * 25 - used);
+    return '庫存 剩約 <b class="num">' + fmt1(leftG / 25) + '</b> 包（' + Math.round(leftG) + 'g）・ 重新盤點 <input class="stk num" data-xstock="meat"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + Math.floor(leftG / 25) + '" aria-label="安森好肉現在剩幾包"> 包';
+  }
   function canRowHtml(c, i, cls, stText, a, left) {
     return '<div class="can ' + cls + '"><div class="no num">' + (canNum(c.n) || "") + '</div>' +
         '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + Math.max(0, left) + '" aria-label="' + no(c.n) + '現在剩幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
@@ -1184,7 +1201,7 @@ input:disabled { opacity: .55; }
     h += '<section class="card"><h2>備用區</h2><div class="back">' +
       '<div class="b"><b>悅緻主食凍乾-鮮魚+羊</b><span>凍乾主要當作誘食，依吃的情況判斷怎麼用</span></div>' +
       '<div class="b"><b>OKAT主食凍乾-鮪+雞</b><span>誘食用，記錄時點「OKAT凍乾」</span></div>' +
-      '<div class="b"><b>安森好肉 三種好肉</b><span>備用，視吃的情況使用。一包 25g 會用好幾次，用完一包自己減 1。</span><div class="st">庫存 剩 <input class="stk num" data-xstock="meat"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + ((settings.xstock && settings.xstock.meat) || 0) + '" aria-label="安森好肉剩幾包"> 包</div></div>' +
+      '<div class="b"><b>安森好肉 三種好肉</b><span>記錄時點「安森好肉」再填克數，算進熱量，庫存自動扣克數（一包 25g，約 109 大卡）。</span><div class="st">' + meatStockHtml(all) + '</div></div>' +
       '<div class="b"><b>美喵人生 消化健康（顆）</b><span>轉食或換季拉吐時輔助消化。轉食順利沒用到的話，之後可當保養，一天一顆打開拌在食物內。</span></div></div></section>';
 
     h += '<section class="card"><details class="rules"><summary>餵食規則</summary><ol>' +
@@ -1251,6 +1268,7 @@ input:disabled { opacity: .55; }
       extras: draft.extras.slice(), symptoms: draft.symptoms.slice(), note: draft.note.trim()
     };
     var cx = draftCtx(all);
+    if (m.extras.indexOf("meat") >= 0) m.meatG = draft.meatG;
     if (cx.bowl) m.prev = cx.prev;
     var pk = cx.rest > 0 ? pickOf(draft, cx.rest) : null; if (pk) m.pick = pk;
     if (draft.weight > 0 && draft.weight < 30) m.weight = Math.round(draft.weight * 100) / 100;
@@ -1287,7 +1305,7 @@ input:disabled { opacity: .55; }
       });
       var dn = dayNut(items);
       out.push("大便：" + poopOf(k) + " 條" + (dayWeight(items) ? "｜體重：" + fmtW(dayWeight(items)) + " kg" : ""));
-      out.push("今日合計：吃進 " + fmtN(dn.eatKcal) + " 大卡（供給 " + fmtN(dn.offKcal) + " 大卡）、水份 " + fmtN(dn.eatWater) + "g（含水率 " + fmtN(dn.pct) + "%）｜依罐頭標示估算，不含備用區");
+      out.push("今日合計：吃進 " + fmtN(dn.eatKcal) + " 大卡（供給 " + fmtN(dn.offKcal) + " 大卡）、水份 " + fmtN(dn.eatWater) + "g（含水率 " + fmtN(dn.pct) + "%）｜依罐頭標示估算，含安森好肉，不含凍乾");
       out.push("");
     });
     return out.join("\n").trim();
@@ -1340,6 +1358,7 @@ input:disabled { opacity: .55; }
     }
     if (m.prev === "eat" || m.prev === "toss") out.prev = m.prev;
     if (typeof m.weight === "number" && m.weight > 0 && m.weight < 30) out.weight = m.weight;
+    if (typeof m.meatG === "number" && m.meatG > 0 && m.meatG <= 100) out.meatG = m.meatG;
     return out;
   }
   function importBackup(text) {
@@ -1513,7 +1532,7 @@ input:disabled { opacity: .55; }
     if (dw) { ly += 42; c.fillText("體重：" + fmtW(dw) + " kg", 48, ly); }
     c.fillStyle = "#7E6F66"; c.font = "400 24px " + BODY;
     c.fillText("食欲分數 4 喜歡吃 ・ 3 吃剩1~2口 ・ 2 吃一半 ・ 1 只吃1~2口 ・ 0 完全不愛", 48, ly + 46);
-    c.fillText("熱量和水份依罐頭標示和實際吃的量估算，不含凍乾等備用區", 48, ly + 84);
+    c.fillText("熱量和水份依罐頭標示和實際吃的量估算，含安森好肉，不含凍乾", 48, ly + 84);
     c.fillText("WIKU 餵食日記", 48, ly + 122);
 
     return new Promise(function (res) { cv.toBlob(function (b) { res(b); }, "image/png"); });
@@ -1565,6 +1584,7 @@ input:disabled { opacity: .55; }
       render(); return;
     }
     if (act === "logView") { logView = el.getAttribute("data-v"); lsSet("wiku.logview", logView); render(); window.scrollTo(0, 0); return; }
+    if (act === "meatStep") { draft.meatG = Math.max(1, Math.min(100, draft.meatG + Number(el.getAttribute("data-d")))); render(); return; }
     if (act === "must") { var mv = Number(el.getAttribute("data-v")); draft.pick = (draft.pick && draft.pick.a === mv && !draft.pick.b) ? null : { a: mv, b: 0, ag: 0 }; render(); return; }
     if (act === "prev") {
       draft.prev = el.getAttribute("data-v"); draft.prevTouched = true;
@@ -1663,7 +1683,7 @@ input:disabled { opacity: .55; }
     else if (t.hasAttribute && t.hasAttribute("data-xstock")) {
       if (isLocked()) { render(); openSheet("unlock"); return; }
       var xv = Math.floor(Number(t.value));
-      if (xv >= 0) { settings.xstock = settings.xstock || {}; settings.xstock[t.getAttribute("data-xstock")] = xv; writeSettings(); }
+      if (xv >= 0) { settings.xstock = settings.xstock || {}; settings.xstock.meat = xv; settings.xstock.meatT = Date.now(); writeSettings(); }
       render();
     }
     else if (t.hasAttribute && t.hasAttribute("data-stock")) {
