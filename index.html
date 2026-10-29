@@ -87,6 +87,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text
 .tag.open { background: var(--accent); color: var(--on-accent); }
 .tag.keep { background: var(--surface); border: 1px dashed var(--stripe); color: var(--ink2); }
 .tag.bowl { background: var(--accent-soft); color: var(--ink); border: 1.5px solid var(--s2); }
+.mustbox { display: flex; flex-direction: column; gap: 8px; border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; background: var(--accent-soft); border: 2px solid var(--accent); font-size: 14px; }
+.mustbox b { font-weight: 700; }
+.mustbox .why { font-size: 13px; color: var(--ink2); }
+.mustok { font-size: 13px; color: var(--ink2); background: var(--surface2); border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; }
 .leftover { display: flex; flex-direction: column; gap: 8px; border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface2); border: 1.5px dashed var(--stripe); font-size: 14px; }
 .leftover.warn { border: 2px solid var(--s1); }
 .leftover b { font-weight: 700; }
@@ -314,15 +318,20 @@ input:disabled { opacity: .55; }
     { n: 5, short: "唯美味易開餐包-雞肉+鮭魚", name: "唯美餐雞鮭", g: 80, kind: "餐包", kcal: 95, water: 83, est: false, src: "唯美味標示：76 大卡／80g，水分最多 83%（雞鮭同遊）" },
     { n: 6, short: "法麗全照護-雞+番茄慕斯", name: "法黑罐番茄", g: 80, kind: "罐", kcal: 79, water: 83, est: false, src: "法麗包裝標示：79 大卡／100g，水分 83% 以下" },
     { n: 7, short: "克勞德餐包-05號雞+鮪+菠", name: "克餐05", g: 85, kind: "餐包", kcal: 93.2, water: 80, est: false, src: "克勞德標示：代謝能 79.2 kcal／包（85g），水分 80%（NO.5 鮮雞鮪魚炒菠菜）" },
-    { n: 8, short: "法麗全照護-雞+鮪魚慕斯", name: "法黑罐鮪魚", g: 80, kind: "罐", kcal: 85, water: 83, est: false, src: "Purrmaster 營養資料庫（引用 pettric 商品頁）：85 大卡／100g，水分 83% 以下；法麗官網沒有單一口味資料，請對照罐身" }
+    { n: 8, short: "法麗全照護-雞+鮪魚慕斯", name: "法黑罐鮪魚", g: 80, kind: "罐", kcal: 85, water: 83, est: false, src: "Purrmaster 營養資料庫（引用 pettric 商品頁）：85 大卡／100g，水分 83% 以下；法麗官網沒有單一口味資料，請對照罐身" },
+    { n: 9, short: "唯美味-美味樂透雞(雞胸肉)", name: "唯美樂透雞", g: 85, kind: "罐", kcal: 65.9, water: 87, est: false, src: "唯美味標示：56 大卡／85g，水分最多 87%（美味樂透雞）" },
+    { n: 10, short: "波菲特-安心鶉(鵪鶉)", name: "波菲特鶉", g: 80, kind: "罐", kcal: 106, water: 79.3, est: false, src: "波菲特標示：106 大卡／100g，水分 79.3% 以下，淨重 80g" },
+    { n: 11, short: "GUSSTO惡魔喵6號-火雞+鮪魚", name: "惡魔喵6號", g: 85, kind: "餐包", kcal: 96, water: 80, est: false, src: "GUSSTO 標示：95.96 大卡／100g，水分 80%，淨重 85g" }
   ];
   /* 吃的順序：from 之後開始用這組。舊紀錄照當時的順序算，不會被改掉 */
   var LINEUPS = [
     { from: 0, cans: [1, 2, 3, 4, 5, 6, 7] },
-    { from: 1793182500000, cans: [7, 8] }   // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
+    { from: 1793182500000, cans: [7, 8] },  // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
+    { from: 1793283000000, cans: [5, 4, 9, 6, 2], must: [10, 11, 7] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
   ];
   function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
-  function luOf(t) { return LINEUPS[lineupAt(t)].cans; }
+  function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || []); }
+  function mustOf(t) { return LINEUPS[lineupAt(t)].must || []; }
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
   var SCORES = [
     { v: 4, short: "喜歡吃", full: "喜歡吃" },
@@ -358,7 +367,7 @@ input:disabled { opacity: .55; }
   /* ---------- 狀態 ---------- */
   var meals = [];
   var days = {};           // 每天的紀錄：{ "2026-10-24": { poop: 2 } }
-  var settings = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
+  var settings = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3, stockT: CANS.map(function () { return 0; }) };
   var tab = "today";
   var logView = "days";    // 紀錄頁：每天 / 歷史
   var draft = null;
@@ -376,10 +385,13 @@ input:disabled { opacity: .55; }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 
   function normSettings(s) {
-    var out = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3 };
+    var out = { portion: 50, sizes: CANS.map(function (c) { return c.g; }), stock: CANS.map(function () { return 3; }), nut: defNut(), nutV: 3, stockT: CANS.map(function () { return 0; }) };
     if (s && typeof s.portion === "number" && s.portion > 0) out.portion = s.portion;
     if (s && Array.isArray(s.sizes)) out.sizes = CANS.map(function (c, i) { var v = s.sizes[i]; return v > 0 ? v : c.g; });
     if (s && Array.isArray(s.stock)) out.stock = CANS.map(function (c, i) { var v = s.stock[i]; return v >= 0 ? v : 3; });
+    out.xstock = { meat: 0 };
+    if (s && s.xstock && s.xstock.meat >= 0) out.xstock.meat = Math.floor(s.xstock.meat);
+    out.stockT = CANS.map(function (c, i) { var v = s && Array.isArray(s.stockT) ? s.stockT[i] : 0; return v > 0 ? v : 0; });
     if (s && (s.nutV === 2 || s.nutV === 3) && Array.isArray(s.nut)) out.nut = CANS.map(function (c, i) { var v = s.nut[i]; return v && v.k > 0 && v.w >= 0 && v.w <= 100 ? { k: v.k, w: v.w } : out.nut[i]; });
     /* v3：克勞德 05 號改用包裝實際標示；舊的推估值（90／80）沒被改過就換成新的 */
     if (s && s.nutV === 2 && out.nut[6] && out.nut[6].k === 0.9 && out.nut[6].w === 80) out.nut[6] = defNut()[6];
@@ -617,8 +629,16 @@ input:disabled { opacity: .55; }
   /* 手動指定罐頭：pick = [{can, g}, ...]；冰箱剩的同一罐先用，不夠再開新的 */
   function allocatePick(st, pick, sizes) {
     var parts = [];
+    var mu = LINEUPS[st.li || 0].must || [];
     pick.forEach(function (q) {
       var need = q.g;
+      if (mu.indexOf(q.can) >= 0) {   // 必須餐：自己的冰箱格，不影響輪替
+        st.mfr = st.mfr || {};
+        var f = st.mfr[q.can];
+        if (f && f.g > 0) { var tk0 = Math.min(need, f.g); parts.push({ can: q.can, g: tk0, src: "fridge", round: f.round }); f.g -= tk0; need -= tk0; if (f.g <= 0) delete st.mfr[q.can]; }
+        if (need > 0) { var sz = sizes[q.can - 1], tk1 = Math.min(need, sz); parts.push({ can: q.can, g: tk1, src: "open", rem: sz - tk1, round: 1, must: true }); if (sz - tk1 > 0) st.mfr[q.can] = { can: q.can, g: sz - tk1, round: 1 }; }
+        return;
+      }
       if (st.left && st.left.can === q.can && st.left.g > 0) {
         var take = Math.min(need, st.left.g);
         parts.push({ can: q.can, g: take, src: "fridge", round: st.left.round });
@@ -640,13 +660,17 @@ input:disabled { opacity: .55; }
     if (k <= (st.li || 0)) return;
     st.li = k;
     var lu = LINEUPS[k].cans;
-    if (st.left && lu.indexOf(st.left.can) < 0) st.left = null;
+    var mu = LINEUPS[k].must || [];
+    st.mfr = st.mfr || {};
+    // 冰箱裡剩的照樣先吃完：是必須餐就放到必須餐的冰箱格，其他的留著，下一餐先用
+    if (st.left && lu.indexOf(st.left.can) < 0 && mu.indexOf(st.left.can) >= 0) { st.mfr[st.left.can] = st.left; st.left = null; }
     if (st.left) st.left.round = 1;
-    st.next = st.left ? lu.indexOf(st.left.can) + 1 : 0;
+    st.next = st.left && lu.indexOf(st.left.can) >= 0 ? lu.indexOf(st.left.can) + 1 : 0;
   }
   function cloneSt(st) {
     var b = st.bowl;
     return { next: st.next, li: st.li || 0, left: st.left ? { can: st.left.can, g: st.left.g, round: st.left.round } : null,
+      mfr: st.mfr ? JSON.parse(JSON.stringify(st.mfr)) : {},
       bowl: b ? { g: b.g, comp: b.comp.map(function (q) { return { can: q.can, g: q.g }; }), refed: b.refed, round: b.round, t: b.t } : null };
   }
   /* 碗裡沒吃完的（上餐剩的）：把各口味按比例換算成 target 克 */
@@ -812,6 +836,23 @@ input:disabled { opacity: .55; }
     return h + "</ul>";
   }
 
+  function dayHasMust(all, k, mu) {
+    var hit = null;
+    all.list.forEach(function (x) { if (dayKey(x.m.t) === k && (!draft.id || x.m.id !== draft.id)) x.parts.forEach(function (p) { if (mu.indexOf(p.can) >= 0) hit = p.can; }); });
+    return hit;
+  }
+  function mustHtml(all, ctx, used) {
+    var mu = mustOf(draft.t);
+    if (!mu.length) return "";
+    var done = dayHasMust(all, dayKey(draft.t), mu);
+    if (done) return '<div class="mustok">今天已吃過必須餐：' + esc(canShort(done)) + ' ✓</div>';
+    var mfr = ctx.base.mfr || {}, h = '<div class="mustbox"><b>今天還沒吃必須餐</b><span class="why">一天至少要有一餐是下面其中一種，選一種這餐就用它。</span><div class="chips">';
+    mu.forEach(function (cn) {
+      var on = draft.pick && draft.pick.a === cn && !draft.pick.b, f = mfr[cn], left = settings.stock[cn - 1] - used[cn - 1];
+      h += '<button class="chip" data-act="must" data-v="' + cn + '" aria-pressed="' + !!on + '">' + esc(CANS[cn - 1].short) + (f ? '・冰箱 ' + f.g + 'g' : '') + '・剩 ' + left + '</button>';
+    });
+    return h + '</div></div>';
+  }
   function leftoverHtml(ctx) {
     var b = ctx.bowl;
     if (!b) return "";
@@ -894,9 +935,10 @@ input:disabled { opacity: .55; }
     var used = CANS.map(function () { return 0; });
     all.list.forEach(function (x) {
       if (editing && found && x.seq >= found.seq) return;
-      x.parts.forEach(function (p) { if (p.src === "open") used[p.can - 1]++; });
+      x.parts.forEach(function (p) { if (p.src === "open" && x.m.t >= (settings.stockT[p.can - 1] || 0)) used[p.can - 1]++; });
     });
     h += leftoverHtml(ctx);
+    h += mustHtml(all, ctx, used);
     h += stepsHtml(plan, used);
     if (ctx.rest > 0) h += pickHtml(autoPlan, ctx.rest);
     var pn = partsNut(plan.parts);
@@ -1096,13 +1138,19 @@ input:disabled { opacity: .55; }
     return '<div class="field"><span class="hint">請長按全選後複製：</span><textarea id="copybox" class="copybox" readonly rows="6">' + esc(openCopy.text) + '</textarea></div>';
   }
 
+  function canRowHtml(c, i, cls, stText, a, left) {
+    return '<div class="can ' + cls + '"><div class="no num">' + c.n + '</div>' +
+        '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + Math.max(0, left) + '" aria-label="' + c.n + '號現在剩幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
+        '<details class="more" data-more="' + i + '"' + (moreOpen[i] ? " open" : "") + '><summary>熱量、水分' + (c.est ? '（推估）' : '') + '</summary><div class="st">熱量 <input class="stk num" id="nk' + i + '" data-nk="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="300" step="0.1" value="' + (Math.round(settings.nut[i].k * 1000) / 10) + '" aria-label="' + c.n + '號每100克熱量"> 大卡/100g</div><div class="st">水分 <input class="stk num" id="nw' + i + '" data-nw="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="99" step="0.5" value="' + settings.nut[i].w + '" aria-label="' + c.n + '號水分百分比"> %' + (c.est ? ' <b class="estb">推估</b>' : '') + '</div><div class="st">' + esc(c.src) + '</div></details></div>' +
+        '<label class="gw"><input class="num" id="size' + i + '" type="number" inputmode="numeric" min="1" max="400" data-size="' + i + '"' + (isLocked() ? " disabled" : "") + ' value="' + settings.sizes[i] + '" aria-label="' + c.n + '號每' + c.kind + '重量（克）"><span class="hint">g</span></label></div>';
+  }
   function cansTab(all) {
     var st = all.st, lu = LINEUPS[st.li || 0].cans;
     // 目前這一輪各罐狀態
     var nextPos = st.next % lu.length, nextCan = lu[nextPos];
     var round = Math.floor(st.next / lu.length) + 1;
     var scores = {}, usedC = CANS.map(function () { return 0; });
-    all.list.forEach(function (x) { x.parts.forEach(function (p) { if (p.src === "open") usedC[p.can - 1]++; (scores[p.can] = scores[p.can] || []).push(x.m.score); }); });
+    all.list.forEach(function (x) { x.parts.forEach(function (p) { if (p.src === "open" && x.m.t >= (settings.stockT[p.can - 1] || 0)) usedC[p.can - 1]++; (scores[p.can] = scores[p.can] || []).push(x.m.score); }); });
     var h = '<section class="card"><div class="row between"><h2>吃的順序</h2><span class="pill ok">第 <b class="num">' + round + '</b> 輪</span></div>' +
       '<div class="hint">' + lu.map(function (n) { return n + "號"; }).join(" → ") + " 依序吃，每個口味開一罐吃完再換下一個。全部吃過一次算一輪，再從 " + lu[0] + ' 號開始。</div>';
     if (st.bowl) h += '<div class="fridge-note">上一餐剩的：<b>' + st.bowl.comp.map(function (q) { return q.can + "號【" + esc(canShort(q.can)) + '】<span class="num"> ' + q.g + 'g</span>'; }).join(" + ") + '</b>，下一餐可以先給牠吃，或倒掉。</div>';
@@ -1115,18 +1163,25 @@ input:disabled { opacity: .55; }
       var a = avg(scores[c.n] || []);
       var left = settings.stock[i] - usedC[i];
       var stText = fridgeNow ? "冰箱有剩，下一餐先吃" : nextCan === cn ? (st.left ? "冰箱的用完就開這個" : "下一個要開") : passed ? "本輪已吃過" : "還沒輪到";
-      h += '<div class="can ' + (isNow ? "now" : passed ? "done" : "") + '"><div class="no num">' + c.n + '</div>' +
-        '<div class="nm">' + esc(c.short) + '<span>' + esc(c.name) + '（' + c.kind + '）・ ' + stText + (a != null ? " ・ 平均 " + fmt1(a) + " 分" : "") + '</span><div class="st">庫存 剩 <b class="num">' + left + '</b> / <input class="stk num" id="stock' + i + '" data-stock="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + settings.stock[i] + '" aria-label="' + c.n + '號總共幾' + c.kind + '"> ' + c.kind + (left <= 0 ? ' <b style="color:var(--s0)">要補貨</b>' : '') + '</div>' +
-        '<details class="more" data-more="' + i + '"' + (moreOpen[i] ? " open" : "") + '><summary>熱量、水分' + (c.est ? '（推估）' : '') + '</summary><div class="st">熱量 <input class="stk num" id="nk' + i + '" data-nk="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="300" step="0.1" value="' + (Math.round(settings.nut[i].k * 1000) / 10) + '" aria-label="' + c.n + '號每100克熱量"> 大卡/100g</div><div class="st">水分 <input class="stk num" id="nw' + i + '" data-nw="' + i + '"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="decimal" min="1" max="99" step="0.5" value="' + settings.nut[i].w + '" aria-label="' + c.n + '號水分百分比"> %' + (c.est ? ' <b class="estb">推估</b>' : '') + '</div><div class="st">' + esc(c.src) + '</div></details></div>' +
-        '<label class="gw"><input class="num" id="size' + i + '" type="number" inputmode="numeric" min="1" max="400" data-size="' + i + '"' + (isLocked() ? " disabled" : "") + ' value="' + settings.sizes[i] + '" aria-label="' + c.n + '號每' + c.kind + '重量（克）"><span class="hint">g</span></label></div>';
+      h += canRowHtml(c, i, isNow ? "now" : passed ? "done" : "", stText, a, left);
     });
+    var mu = LINEUPS[st.li || 0].must || [];
+    if (mu.length) {
+      var tk = dayKey(Date.now()), doneM = null;
+      all.list.forEach(function (x) { if (dayKey(x.m.t) === tk) x.parts.forEach(function (p) { if (mu.indexOf(p.can) >= 0) doneM = p.can; }); });
+      h += '<h2 style="margin-top:8px">必須餐</h2><div class="hint">一天至少要有一餐是其中一種，不排進上面的順序。今天' + (doneM ? '已吃過 ' + esc(canShort(doneM)) + ' ✓' : '還沒吃，記錄時會跳出來讓你選') + '。</div>';
+      mu.forEach(function (cn) {
+        var c = CANS[cn - 1], i = cn - 1, f = (st.mfr || {})[cn], a = avg(scores[c.n] || []);
+        h += canRowHtml(c, i, f ? "now" : "", f ? "冰箱有 " + f.g + "g" : "必須餐", a, settings.stock[i] - usedC[i]);
+      });
+    }
     if (isLocked()) h += '<div class="lockbar"><span>' + LOCK_SVG + ' 只能看：克數、庫存、熱量要有編輯金鑰才能改</span><button class="btn small" data-act="unlock">輸入金鑰</button></div>';
-    h += '<div class="hint">右邊的克數是每罐／每包的重量，庫存是單據上的數量，開一罐就扣 1，都可以直接改。熱量和水分都是照包裝標示，點「熱量、水分」展開，可照包裝修改。</div></section>';
+    h += '<div class="hint">右邊的克數是每罐／每包的重量。庫存填「現在手上剩幾個」，之後每開一罐自動扣 1。熱量和水分都是照包裝標示，點「熱量、水分」展開，可照包裝修改。</div></section>';
 
     h += '<section class="card"><h2>備用區</h2><div class="back">' +
       '<div class="b"><b>悅緻主食凍乾-鮮魚+羊</b><span>凍乾主要當作誘食，依吃的情況判斷怎麼用</span></div>' +
       '<div class="b"><b>OKAT主食凍乾-鮪+雞</b><span>誘食用，記錄時點「OKAT凍乾」</span></div>' +
-      '<div class="b"><b>安森好肉 三種好肉</b><span>備用，視吃的情況使用</span></div>' +
+      '<div class="b"><b>安森好肉 三種好肉</b><span>備用，視吃的情況使用。一包 25g 會用好幾次，用完一包自己減 1。</span><div class="st">庫存 剩 <input class="stk num" data-xstock="meat"' + (isLocked() ? " disabled" : "") + ' type="number" inputmode="numeric" min="0" max="99" value="' + ((settings.xstock && settings.xstock.meat) || 0) + '" aria-label="安森好肉剩幾包"> 包</div></div>' +
       '<div class="b"><b>美喵人生 消化健康（顆）</b><span>轉食或換季拉吐時輔助消化。轉食順利沒用到的話，之後可當保養，一天一顆打開拌在食物內。</span></div></div></section>';
 
     h += '<section class="card"><details class="rules"><summary>餵食規則</summary><ol>' +
@@ -1507,6 +1562,7 @@ input:disabled { opacity: .55; }
       render(); return;
     }
     if (act === "logView") { logView = el.getAttribute("data-v"); lsSet("wiku.logview", logView); render(); window.scrollTo(0, 0); return; }
+    if (act === "must") { var mv = Number(el.getAttribute("data-v")); draft.pick = (draft.pick && draft.pick.a === mv && !draft.pick.b) ? null : { a: mv, b: 0, ag: 0 }; render(); return; }
     if (act === "prev") {
       draft.prev = el.getAttribute("data-v"); draft.prevTouched = true;
       if (!draft.id) { draft.offTouched = false; var cp = draftCtx(computeAll()); draft.offered = cp.prev === "eat" ? cp.bowl.g : settings.portion; }
@@ -1601,9 +1657,15 @@ input:disabled { opacity: .55; }
       if (t.hasAttribute("data-nw") && nv > 0 && nv < 100) settings.nut[ni].w = nv;
       writeSettings(); render();
     }
+    else if (t.hasAttribute && t.hasAttribute("data-xstock")) {
+      if (isLocked()) { render(); openSheet("unlock"); return; }
+      var xv = Math.floor(Number(t.value));
+      if (xv >= 0) { settings.xstock = settings.xstock || {}; settings.xstock[t.getAttribute("data-xstock")] = xv; writeSettings(); }
+      render();
+    }
     else if (t.hasAttribute && t.hasAttribute("data-stock")) {
       var si = Number(t.getAttribute("data-stock")), sv = Math.floor(Number(t.value));
-      if (sv >= 0) { settings.stock[si] = sv; writeSettings(); }
+      if (sv >= 0) { settings.stock[si] = sv; settings.stockT[si] = Date.now(); writeSettings(); }  // 打的數字＝現在手上剩幾個
       render();
     }
     else if (t.hasAttribute && t.hasAttribute("data-size")) {
