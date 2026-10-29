@@ -797,10 +797,14 @@ input:disabled { opacity: .55; }
 
   /* ---------- 時間工具 ---------- */
   function p2(n) { return (n < 10 ? "0" : "") + n; }
-  function dayKey(t) { var d = new Date(t); return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
-  function dayLabel(t) { var d = new Date(t); return (d.getMonth() + 1) + "/" + d.getDate() + "（" + DAYN[d.getDay()] + "）"; }
+  /* 一天從凌晨 2 點開始：00:00～01:59 算前一天 */
+  var DAY_START_H = 2;
+  function sh(t) { return t - DAY_START_H * 3600000; }
+  function rawKey(d) { return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
+  function dayKey(t) { return rawKey(new Date(sh(t))); }
+  function dayLabel(t) { var d = new Date(sh(t)); return (d.getMonth() + 1) + "/" + d.getDate() + "（" + DAYN[d.getDay()] + "）"; }
   function hm(t) { var d = new Date(t); return p2(d.getHours()) + ":" + p2(d.getMinutes()); }
-  function toLocalInput(t) { var d = new Date(t); return dayKey(t) + "T" + p2(d.getHours()) + ":" + p2(d.getMinutes()); }
+  function toLocalInput(t) { var d = new Date(t); return rawKey(d) + "T" + p2(d.getHours()) + ":" + p2(d.getMinutes()); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function scoreFull(v) { return SCORES.filter(function (s) { return s.v === v; })[0].full; }
   function avg(arr) { return arr.length ? arr.reduce(function (a, b) { return a + b; }, 0) / arr.length : null; }
@@ -971,7 +975,7 @@ input:disabled { opacity: .55; }
     if (draft.eaten == null || isNaN(draft.eaten)) miss.push("填吃的量");
     h += '<section class="card" aria-labelledby="h-rec"><h2 id="h-rec">' + (editing ? "修改這一餐" : "記錄這一餐") + '</h2>';
     if (isLocked()) h += '<div class="lockbar"><span>' + LOCK_SVG + ' 這支手機只能看，要記錄請先輸入編輯金鑰</span><button class="btn small" data-act="unlock">輸入金鑰</button></div>';
-    if (draft.weight != null || draft.wantW || (new Date(draft.t).getDay() === 6 && n === 1)) {
+    if (draft.weight != null || draft.wantW || (new Date(sh(draft.t)).getDay() === 6 && n === 1)) {
       h += '<div class="field wfield"><label class="label" for="weight">體重（每週六第一餐記一次）</label><div class="wt"><input id="weight" class="num" type="number" inputmode="decimal" min="0.5" max="30" step="0.01" placeholder="例如 4.25" value="' + (draft.weight == null ? "" : draft.weight) + '"><span class="hint">kg</span>' +
         (editing ? '<button class="btn small" data-act="save"' + (miss.length ? " disabled" : "") + '>儲存體重</button>' : '') + '</div></div>';
     }
@@ -1017,7 +1021,7 @@ input:disabled { opacity: .55; }
     if (tm.length) {
       var first = tm[tm.length - 1];
       h += '<section class="card"><h2>今天已記錄</h2>';
-      if (new Date().getDay() === 6 && !(first.m.weight > 0) && draft.id !== first.m.id) {
+      if (new Date(sh(Date.now())).getDay() === 6 && !(first.m.weight > 0) && draft.id !== first.m.id) {
         h += '<div class="suggest"><span>今天週六，第一餐還沒記體重</span><button class="btn small" data-act="edit" data-focus="weight" data-id="' + esc(first.m.id) + '">補記體重</button></div>';
       }
       h += poopBox(today) +
@@ -1071,20 +1075,20 @@ input:disabled { opacity: .55; }
   }
   function historyHtml(all) {
     var byMonth = {}, months = [];
-    all.list.forEach(function (x) { var d = new Date(x.m.t), mk = d.getFullYear() + "-" + p2(d.getMonth() + 1); if (!byMonth[mk]) { byMonth[mk] = []; months.push(mk); } byMonth[mk].push(x); });
+    all.list.forEach(function (x) { var d = new Date(sh(x.m.t)), mk = d.getFullYear() + "-" + p2(d.getMonth() + 1); if (!byMonth[mk]) { byMonth[mk] = []; months.push(mk); } byMonth[mk].push(x); });
     months.sort().reverse();
     var h = "", thisMonth = months[0];
     months.forEach(function (mk) {
       var items = byMonth[mk], y = Number(mk.slice(0, 4)), mo = Number(mk.slice(5)) - 1;
       var first = new Date(y, mo, 1), last = new Date(y, mo + 1, 0), mkeys = [];
-      for (var d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) mkeys.push(dayKey(d.getTime()));
+      for (var d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) mkeys.push(rawKey(d));
       h += '<section class="card"><details class="hmonth"' + (mk === thisMonth ? " open" : "") + '><summary><h2>' + y + ' 年 ' + (mo + 1) + ' 月</h2><span class="hint">' + statsOf(items, mkeys).days + ' 天有紀錄</span></summary>';
       h += '<div class="hstats hmsum">' + statsLine(statsOf(items, mkeys)) + '</div><div class="hweeks">';
       var ws = weekStart(last.getTime());
       while (ws.getTime() + 7 * 864e5 > first.getTime()) {
         var cells = "", wkeys = [], wItems = [];
         for (var i = 0; i < 7; i++) {
-          var dd = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i), k = dayKey(dd.getTime()), inM = dd.getMonth() === mo;
+          var dd = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i), k = rawKey(dd), inM = dd.getMonth() === mo;
           var di = items.filter(function (x) { return dayKey(x.m.t) === k; });
           if (inM) { wkeys.push(k); wItems = wItems.concat(di); }
           var a = avg(di.map(function (x) { return x.m.score; }));
@@ -1118,7 +1122,7 @@ input:disabled { opacity: .55; }
     var todayK = dayKey(Date.now()), recentDays = order.slice(0, 7).reverse();
     h += '<section class="card"><div class="row between"><h2>最近 ' + recentDays.length + ' 天</h2><span class="hint">每根是一餐的食欲</span></div><div class="trend" role="img" aria-label="最近幾天每餐的食欲分數和當天吃進的熱量">';
     recentDays.forEach(function (k) {
-      var items = days[k].slice().sort(function (a, b) { return a.m.t - b.m.t; }), d = new Date(items[0].m.t);
+      var items = days[k].slice().sort(function (a, b) { return a.m.t - b.m.t; }), d = new Date(sh(items[0].m.t));
       h += '<div class="d' + (k === todayK ? " today" : "") + '"><span class="kc num">' + fmtN(dayNut(items).eatKcal) + '</span><div class="bars">';
       items.forEach(function (x) { h += '<i style="--sc:var(--s' + x.m.score + ');height:' + Math.max(8, x.m.score / 4 * 100) + '%" title="第' + x.n + '餐 ' + x.m.score + '分"></i>'; });
       h += '</div><span class="dl">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span></div>';
@@ -1467,7 +1471,7 @@ input:disabled { opacity: .55; }
     if (cat) { var cw = 280, ch = cw * cat.height / cat.width; c.drawImage(cat, 48, 40 + (230 - ch) / 2, cw, ch); }
     c.fillStyle = "#4A3F3A"; c.font = "400 68px " + DISP; c.fillText("WIKU 餵食日記", 360, 130);
     c.fillStyle = "#B3665D"; c.font = "400 52px " + DISP; c.fillText(dayLabel(items[0].m.t), 360, 205);
-    c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(new Date(items[0].m.t).getFullYear() + " ・ 今天的吃飯狀況 ・ " + (over ? "範例" : "製作於 " + hm(Date.now())), 360, 255);
+    c.fillStyle = "#7E6F66"; c.font = "400 30px " + BODY; c.fillText(new Date(sh(items[0].m.t)).getFullYear() + " ・ 今天的吃飯狀況 ・ " + (over ? "範例" : "製作於 " + hm(Date.now())), 360, 255);
 
     if (over) { c.fillStyle = "#B3665D"; c.font = "400 40px " + DISP; c.textAlign = "right"; c.fillText("範例", W - 48, 100); c.textAlign = "left"; }
     // 大便（圖案）：放在最上面
