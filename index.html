@@ -1199,13 +1199,13 @@ input:disabled { opacity: .55; }
         h += canRowHtml(c, i, f ? "now" : "", f ? "冰箱有 " + f.g + "g" : "必須餐", a, settings.stock[i] - usedC[i]);
       });
     }
+    h += '<h2 style="margin-top:8px">原肉</h2><div class="can"><div class="no num">肉</div><div class="nm">安森好肉 三種好肉<span>虱目魚、牧野雞、鴕鳥（一包 25g，約 109 大卡）・ 記錄時在備用區點「安森好肉」再填克數，算進熱量</span><div class="st">' + meatStockHtml(all) + '</div></div><label class="gw"><span class="hint">25g/包</span></label></div>';
     if (isLocked()) h += '<div class="lockbar"><span>' + LOCK_SVG + ' 只能看：克數、庫存、熱量要有編輯金鑰才能改</span><button class="btn small" data-act="unlock">輸入金鑰</button></div>';
     h += '<div class="hint">右邊的克數是每罐／每包的重量。庫存填「現在手上剩幾個」，之後每開一罐自動扣 1。熱量和水分都是照包裝標示，點「熱量、水分」展開，可照包裝修改。</div></section>';
 
     h += '<section class="card"><h2>備用區</h2><div class="back">' +
       '<div class="b"><b>悅緻主食凍乾-鮮魚+羊</b><span>凍乾主要當作誘食，依吃的情況判斷怎麼用</span></div>' +
       '<div class="b"><b>OKAT主食凍乾-鮪+雞</b><span>誘食用，記錄時點「OKAT凍乾」</span></div>' +
-      '<div class="b"><b>安森好肉 三種好肉</b><span>記錄時點「安森好肉」再填克數，算進熱量，庫存自動扣克數（一包 25g，約 109 大卡）。</span><div class="st">' + meatStockHtml(all) + '</div></div>' +
       '<div class="b"><b>美喵人生 消化健康（顆）</b><span>轉食或換季拉吐時輔助消化。轉食順利沒用到的話，之後可當保養，一天一顆打開拌在食物內。</span></div></div></section>';
 
     h += '<section class="card"><details class="rules"><summary>餵食規則</summary><ol>' +
