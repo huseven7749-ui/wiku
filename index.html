@@ -329,12 +329,12 @@ input:disabled { opacity: .55; }
   var LINEUPS = [
     { from: 0, cans: [1, 2, 3, 4, 5, 6, 7] },
     { from: 1793182500000, cans: [7, 8] },  // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
-    { from: 1793283000000, cans: [12, 4, 9, 6, 2], must: [10, 11, 7], extra: [13] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
+    { from: 1793283000000, cans: [12, 4, 9, 6, 2, 8], must: [10, 11, 7], extra: [13], order: [12, 4, 9, 6, 2, 10, 11, 7, 13, 8] }  // order＝顯示的號碼順序  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
   ];
   function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
   function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || [], l.extra || []); }
   /* 顯示用的號碼：照最新的清單（盤點時拍照的順序）；不在清單裡的舊罐頭不顯示號碼 */
-  function canNum(can) { var L = LINEUPS[LINEUPS.length - 1], a = L.cans.concat(L.must || [], L.extra || []), i = a.indexOf(can); return i >= 0 ? i + 1 : 0; }
+  function canNum(can) { var L = LINEUPS[LINEUPS.length - 1], a = L.order || L.cans.concat(L.must || [], L.extra || []), i = a.indexOf(can); return i >= 0 ? i + 1 : 0; }
   function no(can) { var n = canNum(can); return n ? n + "號" : ""; }
   function mustOf(t) { return LINEUPS[lineupAt(t)].must || []; }
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
