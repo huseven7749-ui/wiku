@@ -322,18 +322,19 @@ input:disabled { opacity: .55; }
     { n: 9, short: "唯美味-美味樂透雞(雞胸肉)", name: "唯美樂透雞", g: 85, kind: "罐", kcal: 65.9, water: 87, est: false, src: "唯美味標示：56 大卡／85g，水分最多 87%（美味樂透雞）" },
     { n: 10, short: "波菲特-安心鶉(鵪鶉)", name: "波菲特鶉", g: 80, kind: "罐", kcal: 106, water: 79.3, est: false, src: "波菲特標示：106 大卡／100g，水分 79.3% 以下，淨重 80g" },
     { n: 11, short: "GUSSTO惡魔喵6號-火雞+鮪魚", name: "惡魔喵6號", g: 85, kind: "餐包", kcal: 96, water: 80, est: false, src: "GUSSTO 標示：95.96 大卡／100g，水分 80%，淨重 85g" },
-    { n: 12, short: "凱特-早餐吸喵(雞肉+南瓜)", name: "凱特吸喵", g: 85, kind: "餐包", kcal: 68.2, water: 86, est: false, src: "凱特美廚標示：58 大卡／85g（677 大卡／公斤），水分最多 86%" }
+    { n: 12, short: "凱特-早餐吸喵(雞肉+南瓜)", name: "凱特吸喵", g: 85, kind: "餐包", kcal: 68.2, water: 86, est: false, src: "凱特美廚標示：58 大卡／85g（677 大卡／公斤），水分最多 86%" },
+    { n: 13, short: "安森好肉-三種好肉", name: "安森好肉", g: 25, kind: "包", kcal: 437.2, water: 0, est: false, src: "安森標示：虱目魚10g 420.8、牧野雞10g 445、鴕鳥5g 445 大卡/100g，一包 25g 約 109 大卡；包裝沒寫水分，算 0" }
   ];
   /* 吃的順序：from 之後開始用這組。舊紀錄照當時的順序算，不會被改掉 */
   var LINEUPS = [
     { from: 0, cans: [1, 2, 3, 4, 5, 6, 7] },
     { from: 1793182500000, cans: [7, 8] },  // 2026/10/28 18:15 起只吃克勞德05、法麗雞+鮪魚
-    { from: 1793283000000, cans: [12, 4, 9, 6, 2], must: [10, 11, 7] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
+    { from: 1793283000000, cans: [12, 4, 9, 6, 2], must: [10, 11, 7], extra: [13] }  // 2026/10/29 22:10 起；must＝必須餐，一天至少一餐
   ];
   function lineupAt(t) { var k = 0; LINEUPS.forEach(function (l, i) { if (t >= l.from) k = i; }); return k; }
-  function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || []); }
+  function luOf(t) { var l = LINEUPS[lineupAt(t)]; return l.cans.concat(l.must || [], l.extra || []); }
   /* 顯示用的號碼：照最新的清單（盤點時拍照的順序）；不在清單裡的舊罐頭不顯示號碼 */
-  function canNum(can) { var L = LINEUPS[LINEUPS.length - 1], a = L.cans.concat(L.must || []), i = a.indexOf(can); return i >= 0 ? i + 1 : 0; }
+  function canNum(can) { var L = LINEUPS[LINEUPS.length - 1], a = L.cans.concat(L.must || [], L.extra || []), i = a.indexOf(can); return i >= 0 ? i + 1 : 0; }
   function no(can) { var n = canNum(can); return n ? n + "號" : ""; }
   function mustOf(t) { return LINEUPS[lineupAt(t)].must || []; }
   function defNut() { return CANS.map(function (c) { return { k: c.kcal / 100, w: c.water }; }); }
@@ -634,10 +635,10 @@ input:disabled { opacity: .55; }
   /* 手動指定罐頭：pick = [{can, g}, ...]；冰箱剩的同一罐先用，不夠再開新的 */
   function allocatePick(st, pick, sizes) {
     var parts = [];
-    var mu = LINEUPS[st.li || 0].must || [];
+    var mu = (LINEUPS[st.li || 0].must || []).concat(LINEUPS[st.li || 0].extra || []);
     pick.forEach(function (q) {
       var need = q.g;
-      if (mu.indexOf(q.can) >= 0) {   // 必須餐：自己的冰箱格，不影響輪替
+      if (mu.indexOf(q.can) >= 0) {   // 必須餐、安森好肉：自己的冰箱格，不影響輪替
         st.mfr = st.mfr || {};
         var f = st.mfr[q.can];
         if (f && f.g > 0) { var tk0 = Math.min(need, f.g); parts.push({ can: q.can, g: tk0, src: "fridge", round: f.round }); f.g -= tk0; need -= tk0; if (f.g <= 0) delete st.mfr[q.can]; }
@@ -771,7 +772,8 @@ input:disabled { opacity: .55; }
     return [{ can: p.a, g: tot }];
   }
   function pickFromParts(parts, fb) {
-    parts = parts.filter(function (p) { return p.src !== "bowl"; });
+    var ok = luOf(draft ? draft.t : Date.now());
+    parts = parts.filter(function (p) { return p.src !== "bowl" && ok.indexOf(p.can) >= 0; });  // 不在清單的舊罐頭（冰箱剩的）不拿來當預設
     if (!parts.length) return { a: fb || 1, b: 0, ag: 0 };
     var a = parts[0], b = parts[1];
     return { a: a.can, b: b && b.can !== a.can ? b.can : 0, ag: a.g };
@@ -882,7 +884,7 @@ input:disabled { opacity: .55; }
     if (draft.pick) {
       var pk = draft.pick, i;
       h += '<div class="hint">第一個口味</div><div class="chips">';
-      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + no(i) + ' ' + esc(CANS[i - 1].short) + '">' + i + '號 ' + esc(CANS[i - 1].name) + '</button>'; });
+      luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickA" data-v="' + i + '" aria-pressed="' + (pk.a === i) + '" aria-label="' + no(i) + ' ' + esc(CANS[i - 1].short) + '">' + no(i) + ' ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div><div class="hint">第二個口味（不夠才要選）</div><div class="chips"><button class="chip" data-act="pickB" data-v="0" aria-pressed="' + !pk.b + '">不用</button>';
       luOf(draft.t).forEach(function (i) { h += '<button class="chip" data-act="pickB" data-v="' + i + '" aria-pressed="' + (pk.b === i) + '" aria-label="' + no(i) + ' ' + esc(CANS[i - 1].short) + '"' + (pk.a === i ? ' disabled' : '') + '>' + no(i) + ' ' + esc(CANS[i - 1].name) + '</button>'; });
       h += '</div>';
@@ -995,7 +997,7 @@ input:disabled { opacity: .55; }
       '<div class="quick"><button class="chip" data-act="setEaten" data-v="all">全吃完</button><button class="chip" data-act="setEaten" data-v="half">一半</button><button class="chip" data-act="setEaten" data-v="zero">沒吃</button></div></div>';
 
     h += '<div class="field"><span class="label">備用區（有用到就點）</span><div class="chips">';
-    EXTRAS.forEach(function (x) { h += '<button class="chip" data-act="toggle" data-l="extras" data-k="' + x.k + '" aria-pressed="' + (draft.extras.indexOf(x.k) >= 0) + '">' + x.label + '</button>'; });
+    EXTRAS.forEach(function (x) { if (x.k === "meat" && draft.extras.indexOf("meat") < 0) return; h += '<button class="chip" data-act="toggle" data-l="extras" data-k="' + x.k + '" aria-pressed="' + (draft.extras.indexOf(x.k) >= 0) + '">' + x.label + '</button>'; });
     h += '</div>';
     if (draft.extras.indexOf("meat") >= 0) {
       h += '<div class="hint">安森好肉給了幾克（算進熱量）</div><div class="stepper"><button data-act="meatStep" data-d="-5" aria-label="安森好肉減5克">−5</button><button data-act="meatStep" data-d="-1" aria-label="安森好肉減1克">−1</button>' +
@@ -1199,7 +1201,11 @@ input:disabled { opacity: .55; }
         h += canRowHtml(c, i, f ? "now" : "", f ? "冰箱有 " + f.g + "g" : "必須餐", a, settings.stock[i] - usedC[i]);
       });
     }
-    h += '<h2 style="margin-top:8px">原肉</h2><div class="can"><div class="no num">肉</div><div class="nm">安森好肉 三種好肉<span>虱目魚、牧野雞、鴕鳥（一包 25g，約 109 大卡）・ 記錄時在備用區點「安森好肉」再填克數，算進熱量</span><div class="st">' + meatStockHtml(all) + '</div></div><label class="gw"><span class="hint">25g/包</span></label></div>';
+    (LINEUPS[st.li || 0].extra || []).forEach(function (cn) {
+      var c = CANS[cn - 1], i = cn - 1, f = (st.mfr || {})[cn], a = avg(scores[c.n] || []);
+      h += '<h2 style="margin-top:8px">原肉</h2><div class="hint">不排進順序，要給的時候在「這餐用哪一罐」→「自己選」挑它，填克數。</div>';
+      h += canRowHtml(c, i, f ? "now" : "", f ? "已開，剩 " + f.g + "g" : "原肉", a, settings.stock[i] - usedC[i]);
+    });
     if (isLocked()) h += '<div class="lockbar"><span>' + LOCK_SVG + ' 只能看：克數、庫存、熱量要有編輯金鑰才能改</span><button class="btn small" data-act="unlock">輸入金鑰</button></div>';
     h += '<div class="hint">右邊的克數是每罐／每包的重量。庫存填「現在手上剩幾個」，之後每開一罐自動扣 1。熱量和水分都是照包裝標示，點「熱量、水分」展開，可照包裝修改。</div></section>';
 
@@ -1616,7 +1622,7 @@ input:disabled { opacity: .55; }
     }
     if (act === "pickB" && draft.pick) {
       var vb = Number(el.getAttribute("data-v")); draft.pick.b = vb === draft.pick.a ? 0 : vb;
-      if (draft.pick.b && !draft.pick.ag) draft.pick.ag = Math.round(draft.offered / 2);
+      if (draft.pick.b) { var rb = draftCtx(computeAll()).rest, isX = (LINEUPS[lineupAt(draft.t)].extra || []).indexOf(draft.pick.b) >= 0; draft.pick.ag = isX ? Math.max(1, rb - 5) : (draft.pick.ag || Math.round(rb / 2)); }  // 安森好肉預設 5g
       render(); return;
     }
     if (act === "pickG" && draft.pick) {
